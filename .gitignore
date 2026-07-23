@@ -1,4 +1,50 @@
-node_modules
-dist
+# Dependencies
+node_modules/
+
+# Environment variables
+# Vite inlines any VITE_-prefixed var into the client bundle at build time, so
+# nothing secret should live here anyway — but recognition.serverUrl and any
+# future backend credential would, and `*.local` alone does not cover a plain
+# `.env`.
+.env*
+!.env.example
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+
+# Vite local overrides (vite.config.local.ts, .env.local, ...)
 *.local
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# OS files
 .DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude Code (per-machine settings; agent definitions stay tracked)
+.claude/settings.local.json
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Temporary files
+*.tmp
+.cache/

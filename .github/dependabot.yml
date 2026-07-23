@@ -1,10 +1,17 @@
 # Dependabot keeps npm dependencies and GitHub Actions current via weekly,
 # grouped PRs. These PRs are a human-reviewed stream OUTSIDE the agent label
 # state machine — they carry only the `dependencies` label, never
-# `agent` / `status:*`, so nothing picks them up as pipeline work. Routine
-# minor+patch bumps are grouped to avoid PR spam; a breaking major still opens
-# its own PR (Dependabot's default), giving a dedicated reviewable PR per
-# major. All Dependabot PRs run through the same build.yml CI as any other PR.
+# `agent` / `status:*`, so nothing picks them up as pipeline work. All
+# Dependabot PRs run through the same build.yml CI as any other PR.
+#
+# Every group sets `update-types: [minor, patch]` deliberately. A group with
+# only `patterns: ["*"]` does NOT leave majors alone — it sweeps them in, so
+# one PR arrives carrying several unrelated breaking changes at once. That is
+# not hypothetical: the first weekly run here opened exactly two such PRs, one
+# bundling vite 5→8 + typescript 5→7 + @vitejs/plugin-react 4→6, the other
+# bundling react 18→19 + react-dom 18→19 + react-chessboard 4→5. Restricting
+# the groups keeps routine minor+patch noise batched while forcing each major
+# into its own reviewable PR.
 #
 # Note: `stockfish` is deliberately a production dependency even though the
 # engine is served from public/engine/ rather than bundled — `npm run
@@ -26,10 +33,16 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
         patterns:
           - "*"
       production-dependencies:
         dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
         patterns:
           - "*"
 
@@ -45,5 +58,8 @@ updates:
       - "dependencies"
     groups:
       github-actions:
+        update-types:
+          - "minor"
+          - "patch"
         patterns:
           - "*"
