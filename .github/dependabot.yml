@@ -1,0 +1,49 @@
+# Dependabot keeps npm dependencies and GitHub Actions current via weekly,
+# grouped PRs. These PRs are a human-reviewed stream OUTSIDE the agent label
+# state machine — they carry only the `dependencies` label, never
+# `agent` / `status:*`, so nothing picks them up as pipeline work. Routine
+# minor+patch bumps are grouped to avoid PR spam; a breaking major still opens
+# its own PR (Dependabot's default), giving a dedicated reviewable PR per
+# major. All Dependabot PRs run through the same build.yml CI as any other PR.
+#
+# Note: `stockfish` is deliberately a production dependency even though the
+# engine is served from public/engine/ rather than bundled — `npm run
+# sync-engine` copies the .js/.wasm pair out of node_modules. A Dependabot bump
+# to it therefore does NOT refresh public/engine/; re-run sync-engine by hand
+# before merging one.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+    groups:
+      dev-dependencies:
+        dependency-type: "development"
+        patterns:
+          - "*"
+      production-dependencies:
+        dependency-type: "production"
+        patterns:
+          - "*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+    groups:
+      github-actions:
+        patterns:
+          - "*"

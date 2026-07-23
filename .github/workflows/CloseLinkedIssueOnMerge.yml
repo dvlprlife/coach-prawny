@@ -1,0 +1,92 @@
+name: Close Linked Issue On Merge
+
+# Post-merge hygiene for the agent issue workflow.
+#
+# When a PR is merged, this finds the linked issue(s) — from the PR body's
+# closing keywords ("Closes #N") and/or the `issue-<N>-slug` branch name —
+# strips the agent `status: *` workflow labels, and (if still open) closes the
+# issue as completed.
+#
+# PRs in this repo target `main` (the default branch), so GitHub's "Closes #N"
+# keyword already auto-closes the linked issue on merge; the value this adds is
+# clearing the stale `status: *` labels that the native auto-close leaves behind.
+# It also closes the issue defensively in case a PR linked an issue without a
+# closing keyword. It runs label-strip BEFORE the open-check so it still cleans
+# up an issue GitHub has already auto-closed.
+#
+# NOTE: a pull_request workflow runs the copy of this file on the PR's BASE
+# branch, so keep it on every branch that receives PRs (here that's just `main`).
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: close-linked-issue-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  close-linked-issue:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close linked issue(s) and clear status labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          # Agent workflow status labels that should not remain on a resolved issue.
+          STATUS_LABELS=("status: need plan" "status: ready" "status: in-progress" "status: in-review" "status: follow up" "status: agent approved")
+
+          # 1) Issue numbers from PR-body closing keywords (GitHub's set).
+          body_nums="$(printf '%s' "${PR_BODY:-}" \
+            | grep -oiE '(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)[[:space:]]+#[0-9]+' \
+            | grep -oE '[0-9]+' || true)"
+
+          # 2) ...and from an `issue-<number>-slug` branch name.
+          branch_num="$(printf '%s' "${HEAD_REF:-}" | grep -oE '^issue-[0-9]+' | grep -oE '[0-9]+' || true)"
+
+          issues="$(printf '%s\n%s\n' "$body_nums" "$branch_num" | grep -E '^[0-9]+$' | sort -un || true)"
+
+          if [ -z "$issues" ]; then
+            echo "No linked issue found in PR #$PR_NUMBER body or branch name; nothing to do."
+            exit 0
+          fi
+
+          for n in $issues; do
+            current="$(gh issue view "$n" --repo "$REPO" --json labels --jq '.labels[].name' 2>/dev/null || true)"
+            if [ -z "$current" ]; then
+              echo "Issue #$n not found; skipping."
+              continue
+            fi
+
+            # Strip status labels first — GitHub may have already auto-closed the
+            # issue on merge to the default branch, which leaves them behind.
+            for label in "${STATUS_LABELS[@]}"; do
+              if printf '%s\n' "$current" | grep -qxF "$label"; then
+                echo "Removing label '$label' from issue #$n"
+                gh issue edit "$n" --repo "$REPO" --remove-label "$label" || true
+              fi
+            done
+
+            # Close if still open (defensive — handles a PR that linked an issue
+            # without a GitHub closing keyword).
+            state="$(gh issue view "$n" --repo "$REPO" --json state --jq '.state' 2>/dev/null || echo "")"
+            if [ "$state" = "OPEN" ]; then
+              echo "Closing issue #$n"
+              gh issue close "$n" --repo "$REPO" --reason completed \
+                --comment "Closed automatically: resolved by #$PR_NUMBER (merged into \`$BASE_REF\`)."
+            else
+              echo "Issue #$n already ${state:-closed}; status labels cleared."
+            fi
+          done
