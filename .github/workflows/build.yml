@@ -56,4 +56,6 @@ jobs:
       # to delete by accident.
       - name: Verify _headers shipped
         shell: bash
-        run: test -s dist/_headers && echo "ok: dist/_headers"
+        run: |
+          test -s dist/_headers
+          echo "ok: dist/_headers"
