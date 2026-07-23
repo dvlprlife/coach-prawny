@@ -35,10 +35,11 @@ jobs:
       - name: Build (tsc + vite build)
         run: npm run build
       # The Stockfish worker is served from public/engine/ rather than bundled,
-      # precisely so the .wasm sits next to its .js loader. Vite copies public/
-      # verbatim, but nothing type-checks that — a rename or a missed
-      # `npm run sync-engine` would ship a dist/ whose engine silently never
-      # boots. Assert the pair survived the build.
+      # precisely so the .wasm sits next to its .js loader. public/engine/ is
+      # gitignored and regenerated from node_modules by the `prebuild` hook
+      # (scripts/sync-engine.mjs), so on a clean CI checkout these files exist
+      # only if that hook ran and found what it expected. Nothing type-checks
+      # any of it, so assert the pair survived into dist/.
       - name: Verify Stockfish engine assets shipped
         shell: bash
         run: |
