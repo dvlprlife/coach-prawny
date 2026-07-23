@@ -13,13 +13,14 @@
 # the catch-alls keeps routine minor+patch noise batched while forcing each
 # major into its own reviewable PR.
 #
-# The `react` group is the deliberate exception: it omits `update-types` so it
-# carries majors too. react / react-dom and their @types must move in lockstep
-# or the build breaks — @types/react 18 against react 19 does not typecheck —
-# and they span both dependency-types, so the two catch-alls would otherwise
-# split them across separate PRs that each fail CI alone. A dependency lands in
-# the group with the most specific matching pattern, so these four exact names
-# win over the catch-alls' `*`.
+# The `react` and `vite` groups are the deliberate exceptions: they omit
+# `update-types` so they carry majors too. Their members are coupled and must
+# move in lockstep or the PR cannot pass CI on its own — @types/react 18 does
+# not typecheck against react 19, and @vitejs/plugin-react's peer range on vite
+# makes a lone major of either fail `npm ci` with ERESOLVE. The react family
+# also spans both dependency-types, which the two catch-alls cannot express. A
+# dependency lands in the group with the most specific matching pattern, so
+# these exact names win over the catch-alls' `*`.
 #
 # `react-chessboard` is deliberately NOT in that group. Its major is a code
 # migration, not a version bump (v5 drops the `position` prop and the deep types
@@ -46,6 +47,15 @@ updates:
           - "react-dom"
           - "@types/react"
           - "@types/react-dom"
+      # Same reasoning, peer-dependency flavour: @vitejs/plugin-react declares a
+      # peer range on vite, so a major of either alone fails `npm ci` outright
+      # with ERESOLVE — plugin-react 6 against vite 5, and plugin-react 4
+      # against vite 8, both verified. typescript is deliberately not here; its
+      # 5→7 major passes CI on its own.
+      vite:
+        patterns:
+          - "vite"
+          - "@vitejs/plugin-react"
       dev-dependencies:
         dependency-type: "development"
         update-types:
