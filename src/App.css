@@ -101,6 +101,78 @@ body {
   max-width: 420px;
 }
 
+/* Promotion picker. react-chessboard 4 drew its own dialog over the board and
+   handed back the chosen piece; version 5 dropped that entirely, so this is the
+   app's replacement. Fixed rather than absolute so it needs no positioned
+   ancestor and cannot be clipped by .board-wrap's overflow:hidden. */
+.promotion-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(26, 26, 23, 0.45);
+  z-index: 50;
+}
+
+.promotion-picker {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 16px 20px;
+  box-shadow: 0 8px 28px rgba(26, 26, 23, 0.25);
+  text-align: center;
+}
+
+.promotion-prompt {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.promotion-choices {
+  display: flex;
+  gap: 8px;
+}
+
+/* The glyphs carry the meaning, so they are sized well above body text and the
+   button is kept square. Colour comes from the glyph itself (♕ vs ♛), not from
+   the button, so both sides read correctly against the same paper background. */
+.promotion-choice {
+  width: 56px;
+  height: 56px;
+  font-size: 34px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.promotion-choice:hover {
+  border-color: var(--prawn);
+  background: var(--prawn-light);
+}
+
+.promotion-choice:focus-visible {
+  outline: 2px solid var(--prawn);
+  outline-offset: 2px;
+}
+
+.promotion-cancel {
+  margin-top: 12px;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.promotion-cancel:hover { color: var(--prawn); }
+
 .board-controls {
   display: flex;
   flex-wrap: wrap;
