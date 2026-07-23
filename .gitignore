@@ -14,6 +14,12 @@ dist/
 dist-ssr/
 build/
 
+# Stockfish worker + wasm, copied out of node_modules by scripts/sync-engine.mjs
+# (wired to prebuild/predev). Generated from the version pinned in
+# package-lock.json, so committing them would just duplicate a dependency —
+# ~7 MB per copy, and every future bump would add another permanent blob.
+public/engine/
+
 # Vite local overrides (vite.config.local.ts, .env.local, ...)
 *.local
 
