@@ -12,9 +12,14 @@
 // legal destinations, play mode only).
 
 import { useEffect, useRef, useState } from "react";
-import { Chessboard } from "react-chessboard";
-import type { BoardOrientation, Square } from "react-chessboard/dist/chessboard/types";
+import { Chessboard, defaultArrowOptions } from "react-chessboard";
+import type { PieceDropHandlerArgs, SquareHandlerArgs } from "react-chessboard";
 import { Chess } from "chess.js";
+// react-chessboard 5 dropped its exported Square/BoardOrientation types (and the
+// deep `dist/chessboard/types` path they lived on) - it types every square as a
+// plain string. chess.js publishes the same 64-square literal union, so sourcing
+// it there keeps the app's own typing as strict as it was before.
+import type { Square } from "chess.js";
 import { recognizeBoard, NotImplementedError } from "../recognition/recognizeBoard";
 import { config } from "../config/config";
 import {
@@ -31,12 +36,34 @@ import {
 import type { Fen } from "../config/types";
 
 type EditMode = "play" | "setup";
+type BoardOrientation = "white" | "black";
 
-// react-chessboard arrow tuple: [from, to, color?]. Square is a string-literal
-// union of the 64 squares (re-exported so App can build arrows without a second
-// import path).
+// The app's own arrow shape: [from, to, color?]. react-chessboard 5 wants
+// `{ startSquare, endSquare, color }` objects instead, but this tuple stays the
+// internal contract - App.tsx and the helpers below all build arrows with it -
+// and is converted at the <Chessboard> boundary. Keeping the seam means a
+// library shape change doesn't ripple through the app. Square is re-exported so
+// App can type arrows without importing chess.js itself.
 export type { Square };
 export type BoardArrow = [Square, Square, (string | undefined)?];
+
+// The pieces a pawn may become. Kept in board-left-to-right order rather than
+// value order, matching how every chess UI lays the picker out.
+const PROMOTION_PIECES = ["q", "r", "b", "n"] as const;
+type PromotionPiece = (typeof PROMOTION_PIECES)[number];
+const PROMOTION_LABELS: Record<PromotionPiece, string> = {
+  q: "Queen",
+  r: "Rook",
+  b: "Bishop",
+  n: "Knight",
+};
+// Unicode piece glyphs, indexed by colour then piece. Drawn as text rather than
+// reusing react-chessboard's SVGs: those are only reachable through its own
+// render pipeline, not as standalone components.
+const PROMOTION_GLYPHS: Record<"w" | "b", Record<PromotionPiece, string>> = {
+  w: { q: "♕", r: "♖", b: "♗", n: "♘" },
+  b: { q: "♛", r: "♜", b: "♝", n: "♞" },
+};
 
 // Distinct from the rank colors (prawn/sage/muted) used for engine
 // suggestions, so "what this piece can do" reads separately from "what the
@@ -55,6 +82,27 @@ const THREAT_ARROW_COLOR = "#b3302b";
 // than the palette's muted sage, too close to the move arrows' blue to tell
 // apart at arrow width on a busy board.
 const DEFENDER_ARROW_COLOR = "#3f8f63";
+
+// react-chessboard 5 keys each rendered arrow by its square pair alone
+// (`chessboard-arrow-<start>-<end>`), with no colour in the key, so two arrows
+// sharing a pair are two React children with the same key: it warns and drops
+// one. Our three sources overlap legitimately - the engine's suggested move is
+// very often also one of the hovered piece's legal moves - so the list has to be
+// deduped before it goes in. First occurrence wins, and the caller passes them
+// suggestion-first, so the engine's arrow survives and the paler preview
+// duplicate is the one discarded. (Version 4 keyed by index and drew both
+// stacked, which is why this only appeared on the upgrade.)
+function toBoardArrows(list: BoardArrow[]) {
+  const seen = new Set<string>();
+  const out: { startSquare: Square; endSquare: Square; color: string }[] = [];
+  for (const [startSquare, endSquare, color] of list) {
+    const key = `${startSquare}-${endSquare}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ startSquare, endSquare, color: color ?? LEGAL_MOVE_ARROW_COLOR });
+  }
+  return out;
+}
 
 // Every piece of colour `by` bearing down on `square`, as arrows pointing INTO
 // it. Read off the position exactly as given: attackers() ignores whose turn it
@@ -121,30 +169,27 @@ export function BoardInput({
   const sideToMove = getSideToMove(fen);
   const castling = getCastlingRights(fen);
 
-  // react-chessboard takes a pixel width and can't derive one from CSS, so the
-  // board would stay fixed at whatever we hardcode and overflow a narrow screen.
-  // Measuring the wrapper keeps it fluid: it re-fits on viewport resize, an
-  // orientation flip, and when .panels stacks at the 700px breakpoint.
-  const boardWrapRef = useRef<HTMLDivElement>(null);
-  const [boardWidth, setBoardWidth] = useState(360);
-  useEffect(() => {
-    const wrap = boardWrapRef.current;
-    if (!wrap) return;
-    const observer = new ResizeObserver(([entry]) => {
-      const width = entry.contentRect.width;
-      if (width > 0) setBoardWidth(Math.floor(width));
-    });
-    observer.observe(wrap);
-    return () => observer.disconnect();
-  }, []);
+  // A promotion the user has started but not yet resolved. react-chessboard 4
+  // owned this interaction - it withheld onPieceDrop until its own Q/R/B/N
+  // dialog resolved, so the move arrived already carrying the chosen piece.
+  // Version 5 removed the dialog and every prop around it
+  // (onPromotionPieceSelect, promotionToSquare, autoPromoteToQueen), so the
+  // choice is ours to collect or silently lose. Null means no promotion pending.
+  const [pendingPromotion, setPendingPromotion] = useState<{
+    from: Square;
+    to: Square;
+    color: "w" | "b";
+  } | null>(null);
 
-  // react-chessboard memoizes each piece's drag handlers on
-  // [piece, square, currentPosition, id] - NOT on the callback props - so a
-  // callback that reads `mode`/`fen` directly can fire with a stale value
-  // whenever mode changes without the position also changing (e.g. toggling
-  // Play/Set up without moving a piece). Reading through a ref instead of the
-  // closed-over variable sidesteps that: the ref object is stable, so even a
-  // stale closure reads its current .current value.
+  // Kept from the version 4 era, where react-chessboard memoized each piece's
+  // drag handlers on [piece, square, currentPosition, id] rather than on the
+  // callback props, so a handler reading `mode`/`fen` from its closure could
+  // fire with a value that went stale when mode changed without the position
+  // also changing (toggling Play/Set up without moving anything). Version 5
+  // routes handlers through a context provider that re-reads `options` each
+  // render, which should make this unnecessary - but the failure mode is silent
+  // and position-corrupting, and a stable ref costs nothing, so it stays as a
+  // guard rather than something to prove unnecessary and remove.
   const latestRef = useRef({ mode, fen });
   latestRef.current = { mode, fen };
 
@@ -194,27 +239,78 @@ export function BoardInput({
   }
 
   // ---- drag handling ----
-  function onPieceDrop(
-    sourceSquare: string,
-    targetSquare: string,
-    piece: string
-  ): boolean {
-    if (mode === "play") {
-      return tryLegalMove(sourceSquare, targetSquare, piece);
+  // One handler for every drop now. Version 4 had a separate
+  // onPieceDropOffBoard; version 5 folds that in by reporting targetSquare as
+  // null, which is a strict improvement here - the library no longer touches
+  // its own copy of the position on an off-board drop, so the v4 hazard of it
+  // deleting a piece we then refused to remove (board a piece short of the FEN)
+  // cannot happen. Mode and fen still come from latestRef rather than the
+  // closure; see its comment above.
+  function handlePieceDrop({
+    piece,
+    sourceSquare,
+    targetSquare,
+  }: PieceDropHandlerArgs): boolean {
+    const { mode: currentMode, fen: currentFen } = latestRef.current;
+
+    // Dragged off the board entirely.
+    if (targetSquare === null) {
+      // Play mode has no notion of removing a piece mid-game, so snap back.
+      if (currentMode !== "setup") return false;
+      const board = fenToBoard(currentFen);
+      const [file, rank] = squareToIndex(sourceSquare);
+      board[rank][file] = "";
+      commitFen(boardToFen(board, currentFen));
+      return true;
     }
-    return placePiece(sourceSquare, targetSquare, piece);
+
+    if (currentMode === "play") {
+      return tryLegalMove(sourceSquare, targetSquare, piece.pieceType, currentFen);
+    }
+    return placePiece(sourceSquare, targetSquare, piece.pieceType, currentFen);
+  }
+
+  // Would this drop land a pawn on its promotion rank? Asked before the move is
+  // played, so the piece identity has to come from the dragged piece rather than
+  // from the resulting position. Only a legality check away from certain - and
+  // tryLegalMove does that check immediately after.
+  function isPromotion(pieceType: string, to: string): boolean {
+    if (pieceType[1] !== "P") return false;
+    return pieceType[0] === "w" ? to[1] === "8" : to[1] === "1";
   }
 
   // PLAY mode: only accept legal moves. chess.js applies the move and gives the
   // new FEN (which also flips side-to-move correctly, en passant, castling, etc.)
-  // `piece` is "wQ"/"bN"/etc - on a non-promoting move chess.js just ignores an
-  // irrelevant `promotion`, so it's safe to always pass it through. On a
-  // promotion, react-chessboard withholds this call until its own Q/R/N/B
-  // dialog resolves, so `piece` is already the color's actual choice.
-  function tryLegalMove(from: string, to: string, piece: string): boolean {
+  //
+  // Promotions are the one move we cannot complete here, because the piece to
+  // promote to is a user choice and version 5 no longer collects it. So: confirm
+  // the move is legal (as a queen - promotion choice never changes legality),
+  // then park it in pendingPromotion and return false so the pawn snaps back to
+  // its own square while the picker is up. The move is applied for real in
+  // resolvePromotion once a piece is chosen; returning true here would leave the
+  // board showing a pawn sitting on the last rank in a position the FEN doesn't
+  // agree with.
+  function tryLegalMove(
+    from: string,
+    to: string,
+    pieceType: string,
+    currentFen: Fen
+  ): boolean {
     try {
-      const chess = new Chess(fen);
-      const move = chess.move({ from, to, promotion: piece[1].toLowerCase() });
+      const chess = new Chess(currentFen);
+      if (isPromotion(pieceType, to)) {
+        const legal = chess
+          .moves({ square: from as Square, verbose: true })
+          .some((m) => m.to === to);
+        if (!legal) return false;
+        setPendingPromotion({
+          from: from as Square,
+          to: to as Square,
+          color: pieceType[0] as "w" | "b",
+        });
+        return false;
+      }
+      const move = chess.move({ from, to });
       if (!move) return false;
       commitFen(chess.fen(), { san: move.san, from: move.from, to: move.to });
       return true;
@@ -223,45 +319,59 @@ export function BoardInput({
     }
   }
 
+  // Applies the parked promotion with the piece the user picked.
+  function resolvePromotion(choice: PromotionPiece) {
+    if (!pendingPromotion) return;
+    const { from, to } = pendingPromotion;
+    setPendingPromotion(null);
+    try {
+      const chess = new Chess(latestRef.current.fen);
+      const move = chess.move({ from, to, promotion: choice });
+      if (!move) return;
+      commitFen(chess.fen(), { san: move.san, from: move.from, to: move.to });
+    } catch {
+      // Position moved on under the picker (undo, paste, reset). Dropping the
+      // move is the safe outcome - better than forcing a move onto a position
+      // the user is no longer looking at.
+    }
+  }
+
   // SETUP mode: free placement. Move a piece from one square to another
   // regardless of legality; the source square is cleared. This lets users
   // construct any position. We edit the board field of the FEN directly.
-  function placePiece(from: string, to: string, piece: string): boolean {
-    const board = fenToBoard(fen);
+  function placePiece(
+    from: string,
+    to: string,
+    pieceType: string,
+    currentFen: Fen
+  ): boolean {
+    const board = fenToBoard(currentFen);
     const [fromFile, fromRank] = squareToIndex(from);
     const [toFile, toRank] = squareToIndex(to);
-    // piece looks like "wP" / "bN"; convert to FEN char (uppercase=white).
-    const color = piece[0];
-    const type = piece[1];
+    // pieceType looks like "wP" / "bN"; convert to FEN char (uppercase=white).
+    const color = pieceType[0];
+    const type = pieceType[1];
     const fenChar = color === "w" ? type.toUpperCase() : type.toLowerCase();
 
     board[fromRank][fromFile] = "";
     board[toRank][toFile] = fenChar;
 
-    const next = boardToFen(board, fen);
+    const next = boardToFen(board, currentFen);
     commitFen(next);
     return true;
-  }
-
-  // SETUP mode: dragging a piece off the board removes it (react-chessboard
-  // calls this for any off-board drop regardless of mode; play mode ignores
-  // it - you can't delete a piece mid-game, so it just snaps back instead).
-  // Reads mode/fen through latestRef - see its comment above for why.
-  function onPieceDropOffBoard(square: Square, _piece: string) {
-    const { mode: currentMode, fen: currentFen } = latestRef.current;
-    if (currentMode !== "setup") return;
-    const board = fenToBoard(currentFen);
-    const [file, rank] = squareToIndex(square);
-    board[rank][file] = "";
-    commitFen(boardToFen(board, currentFen));
   }
 
   // ---- hover-to-show-legal-moves (play mode only; setup mode has no rules) ----
   // Shows the hovered piece's moves even when it's not that color's turn, by
   // switching the position's active color before asking chess.js for moves -
   // this is a "what can this piece do" preview, not a claim it can move now.
-  function onMouseOverSquare(square: Square) {
+  // Version 5 passes an object ({ piece, square }) where 4 passed the square
+  // string. The piece it hands over is ignored: chess.get below reads the same
+  // thing from the position we are about to reason with anyway, and mixing the
+  // two sources would risk them disagreeing.
+  function onMouseOverSquare({ square: hovered }: SquareHandlerArgs) {
     if (mode !== "play") return;
+    const square = hovered as Square;
     try {
       const chess = new Chess(fen);
       const piece = chess.get(square);
@@ -408,40 +518,85 @@ export function BoardInput({
 
   return (
     <div className="board-input">
-      <div className="board-wrap" ref={boardWrapRef}>
+      <div className="board-wrap">
         <Chessboard
-          position={fen}
-          onPieceDrop={onPieceDrop}
-          onPieceDropOffBoard={onPieceDropOffBoard}
-          // Deliberately constant. react-chessboard memoizes each piece's drag
-          // spec on [piece, square, position, id] - not on its callback props -
-          // so a mode flip with no piece moved leaves this frozen at its old
-          // value. Passing "trash" here would let the library delete a piece
-          // from its OWN copy of the position while we're back in play mode and
-          // our handler correctly refuses: board loses a piece the FEN still
-          // has. Snapback keeps the library from mutating anything; the actual
-          // removal in setup mode is done by onPieceDropOffBoard -> commitFen,
-          // which flows back through the `position` prop. (latestRef fixes the
-          // same staleness for the callback, but it can't reach a prop.)
-          dropOffBoardAction="snapback"
-          onMouseOverSquare={onMouseOverSquare}
-          onMouseOutSquare={onMouseOutSquare}
-          // Pressure arrows are filtered in here rather than at the point
-          // they're computed, so flipping the toggle mid-hover takes effect
-          // right away instead of waiting for the pointer to leave and re-enter
-          // the square.
-          customArrows={[
-            ...arrows,
-            ...pieceMoveArrows,
-            ...(showPressure ? squarePressureArrows : []),
-          ]}
-          customSquareStyles={lastMoveStyles}
-          boardWidth={boardWidth}
-          arePiecesDraggable={true}
-          customArrowColor="#e8663f"
-          boardOrientation={orientation}
+          options={{
+            position: fen,
+            onPieceDrop: handlePieceDrop,
+            onMouseOverSquare,
+            onMouseOutSquare,
+            // Deliberately constant, not `mode === "setup"`. Version 5 only
+            // uses this to decide whether to constrain the drag inside the
+            // board; it never removes anything itself, so leaving it on and
+            // refusing off-board drops in handlePieceDrop keeps the decision in
+            // one place. It also means no <Chessboard> input depends on
+            // component state, which is what made the version 4 equivalent
+            // (dropOffBoardAction) go stale on a mode flip.
+            allowDragOffBoard: true,
+            allowDragging: true,
+            // Pressure arrows are filtered in here rather than at the point
+            // they're computed, so flipping the toggle mid-hover takes effect
+            // right away instead of waiting for the pointer to leave and
+            // re-enter the square. Version 5 wants objects, not tuples.
+            // Suggestion arrows first: toBoardArrows keeps the first of any
+            // duplicated square pair, so the engine's arrow outranks the
+            // hover preview when a move appears in both.
+            arrows: toBoardArrows([
+              ...arrows,
+              ...pieceMoveArrows,
+              ...(showPressure ? squarePressureArrows : []),
+            ]),
+            // User-drawn arrows (right-drag) - version 4's customArrowColor.
+            arrowOptions: { ...defaultArrowOptions, color: "#e8663f" },
+            squareStyles: lastMoveStyles,
+            boardOrientation: orientation,
+            // Version 5 sizes itself from CSS instead of taking a pixel
+            // boardWidth, so the ResizeObserver that used to measure the
+            // wrapper and feed it back in is gone entirely - .board-wrap's own
+            // width is now the only thing deciding this.
+            boardStyle: { width: "100%", height: "auto" },
+          }}
         />
       </div>
+
+      {/* Replaces the picker react-chessboard 4 drew itself. Rendered outside
+          .board-wrap so it is never clipped by the board's own bounds. */}
+      {pendingPromotion && (
+        <div
+          className="promotion-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Choose promotion piece"
+        >
+          <div className="promotion-picker">
+            <span className="promotion-prompt">Promote to</span>
+            <div className="promotion-choices">
+              {PROMOTION_PIECES.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  className="promotion-choice"
+                  onClick={() => resolvePromotion(p)}
+                  title={PROMOTION_LABELS[p]}
+                  aria-label={PROMOTION_LABELS[p]}
+                  autoFocus={p === "q"}
+                >
+                  {PROMOTION_GLYPHS[pendingPromotion.color][p]}
+                </button>
+              ))}
+            </div>
+            {/* The pawn has already snapped back, so dismissing simply abandons
+                the move - no position to undo. */}
+            <button
+              type="button"
+              className="promotion-cancel"
+              onClick={() => setPendingPromotion(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="board-controls">
         <div className="mode-toggle">
