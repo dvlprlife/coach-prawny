@@ -1,0 +1,26 @@
+{
+  "name": "coachprawny",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "sync-engine": "mkdir -p public/engine && cp node_modules/stockfish/bin/stockfish-18-lite-single.js node_modules/stockfish/bin/stockfish-18-lite-single.wasm public/engine/"
+  },
+  "dependencies": {
+    "chess.js": "^1.4.0",
+    "react": "^18.3.1",
+    "react-chessboard": "^4.7.3",
+    "react-dom": "^18.3.1",
+    "stockfish": "^18.0.8"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}

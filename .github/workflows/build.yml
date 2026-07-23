@@ -1,0 +1,59 @@
+name: Build
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is the primary dev platform; Linux is the deploy target
+        # (Cloudflare Pages). macOS is omitted to control private-repo Actions
+        # minutes.
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          cache: 'npm'
+      - run: npm ci
+      # `npm run build` is `tsc && vite build`, so this is the typecheck gate
+      # AND the bundle gate in one step. There is no lint config and no test
+      # suite in this repo yet — when either lands, add it as its own step
+      # above this one.
+      - name: Build (tsc + vite build)
+        run: npm run build
+      # The Stockfish worker is served from public/engine/ rather than bundled,
+      # precisely so the .wasm sits next to its .js loader. Vite copies public/
+      # verbatim, but nothing type-checks that — a rename or a missed
+      # `npm run sync-engine` would ship a dist/ whose engine silently never
+      # boots. Assert the pair survived the build.
+      - name: Verify Stockfish engine assets shipped
+        shell: bash
+        run: |
+          for f in dist/engine/stockfish-18-lite-single.js \
+                   dist/engine/stockfish-18-lite-single.wasm; do
+            if [ ! -s "$f" ]; then
+              echo "missing or empty: $f"
+              exit 1
+            fi
+            echo "ok: $f"
+          done
+      # public/_headers carries the COOP/COEP pair that lets the engine run
+      # cross-origin-isolated on Cloudflare Pages. It is deploy config with no
+      # compile-time reference anywhere, so it is the easiest file in the repo
+      # to delete by accident.
+      - name: Verify _headers shipped
+        shell: bash
+        run: test -s dist/_headers && echo "ok: dist/_headers"

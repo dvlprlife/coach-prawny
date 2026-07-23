@@ -1,0 +1,59 @@
+name: Bug report
+description: Report a defect. Filed issues enter the agent pipeline automatically.
+title: "[Bug]: "
+labels:
+  - "agent"
+  - "status: need plan"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Issues filed with this form are labeled `agent` + `status: need plan`
+        and are picked up by the automated planner. Clear acceptance criteria
+        help the planner write an actionable plan.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happens, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: fen
+    attributes:
+      label: FEN
+      description: >-
+        The position the bug happens on, copied from the FEN box. Most bugs here
+        are position-specific — castling rights, en passant and side-to-move are
+        the usual culprits — so this is the single most useful field.
+      placeholder: "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    validations:
+      required: false
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Paste the FEN above into the FEN box
+        2. Switch to setup mode
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Checklist items the fix must satisfy — the worker treats these as the definition of done.
+      placeholder: |
+        - [ ] ...
+        - [ ] `npm run build` passes
+        - [ ] Verified in a real browser on the FEN above
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Environment / additional context
+      description: Browser, OS, console output, screenshot — optional.
+    validations:
+      required: false
