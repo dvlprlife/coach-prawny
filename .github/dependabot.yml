@@ -4,20 +4,27 @@
 # `agent` / `status:*`, so nothing picks them up as pipeline work. All
 # Dependabot PRs run through the same build.yml CI as any other PR.
 #
-# Every group sets `update-types: [minor, patch]` deliberately. A group with
-# only `patterns: ["*"]` does NOT leave majors alone — it sweeps them in, so
-# one PR arrives carrying several unrelated breaking changes at once. That is
+# The catch-all groups set `update-types: [minor, patch]` deliberately. A group
+# with only `patterns: ["*"]` does NOT leave majors alone — it sweeps them in,
+# so one PR arrives carrying several unrelated breaking changes at once. That is
 # not hypothetical: the first weekly run here opened exactly two such PRs, one
 # bundling vite 5→8 + typescript 5→7 + @vitejs/plugin-react 4→6, the other
 # bundling react 18→19 + react-dom 18→19 + react-chessboard 4→5. Restricting
-# the groups keeps routine minor+patch noise batched while forcing each major
-# into its own reviewable PR.
+# the catch-alls keeps routine minor+patch noise batched while forcing each
+# major into its own reviewable PR.
 #
-# Note: `stockfish` is deliberately a production dependency even though the
-# engine is served from public/engine/ rather than bundled — `npm run
-# sync-engine` copies the .js/.wasm pair out of node_modules. A Dependabot bump
-# to it therefore does NOT refresh public/engine/; re-run sync-engine by hand
-# before merging one.
+# The `react` group is the deliberate exception: it omits `update-types` so it
+# carries majors too. react / react-dom and their @types must move in lockstep
+# or the build breaks — @types/react 18 against react 19 does not typecheck —
+# and they span both dependency-types, so the two catch-alls would otherwise
+# split them across separate PRs that each fail CI alone. A dependency lands in
+# the group with the most specific matching pattern, so these four exact names
+# win over the catch-alls' `*`.
+#
+# `react-chessboard` is deliberately NOT in that group. Its major is a code
+# migration, not a version bump (v5 drops the `position` prop and the deep types
+# import), so it belongs in its own PR. Note the ordering constraint: v5 requires
+# react ^19, so the react group has to land first.
 version: 2
 updates:
   - package-ecosystem: "npm"
@@ -31,6 +38,14 @@ updates:
     labels:
       - "dependencies"
     groups:
+      # Listed first for readability only — Dependabot resolves by pattern
+      # specificity, not by order. No `update-types`, so majors group here too.
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
       dev-dependencies:
         dependency-type: "development"
         update-types:
