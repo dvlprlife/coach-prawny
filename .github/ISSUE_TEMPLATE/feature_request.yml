@@ -1,16 +1,14 @@
 name: Feature request
-description: Propose an enhancement. Filed issues enter the agent pipeline automatically.
+description: Propose an enhancement.
 title: "[Feature]: "
 labels:
-  - "agent"
-  - "status: need plan"
+  - "enhancement"
 body:
   - type: markdown
     attributes:
       value: |
-        Issues filed with this form are labeled `agent` + `status: need plan`
-        and are picked up by the automated planner. Clear acceptance criteria
-        help the planner write an actionable plan.
+        Thanks for the suggestion. Saying what problem the change solves — not
+        just what to build — makes it much easier to judge and to design well.
   - type: textarea
     id: description
     attributes:
@@ -28,14 +26,13 @@ body:
   - type: textarea
     id: acceptance
     attributes:
-      label: Acceptance criteria
-      description: Checklist items the change must satisfy — the worker treats these as the definition of done.
+      label: What would "done" look like?
+      description: Optional, but helpful — the specific behaviour that would mean this is finished.
       placeholder: |
         - [ ] ...
-        - [ ] `npm run build` passes
         - [ ] Verified in a real browser
     validations:
-      required: true
+      required: false
   - type: textarea
     id: out_of_scope
     attributes:

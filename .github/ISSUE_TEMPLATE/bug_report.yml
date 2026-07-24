@@ -1,16 +1,15 @@
 name: Bug report
-description: Report a defect. Filed issues enter the agent pipeline automatically.
+description: Report something that isn't working.
 title: "[Bug]: "
 labels:
-  - "agent"
-  - "status: need plan"
+  - "bug"
 body:
   - type: markdown
     attributes:
       value: |
-        Issues filed with this form are labeled `agent` + `status: need plan`
-        and are picked up by the automated planner. Clear acceptance criteria
-        help the planner write an actionable plan.
+        Thanks for taking the time to file this. The more precisely a bug is
+        described, the faster it gets fixed — a FEN and the steps that trigger
+        it are usually enough to reproduce anything in this app.
   - type: textarea
     id: description
     attributes:
@@ -42,14 +41,13 @@ body:
   - type: textarea
     id: acceptance
     attributes:
-      label: Acceptance criteria
-      description: Checklist items the fix must satisfy — the worker treats these as the definition of done.
+      label: What would "fixed" look like?
+      description: Optional, but helpful — the specific behaviour you'd expect once this is resolved.
       placeholder: |
         - [ ] ...
-        - [ ] `npm run build` passes
         - [ ] Verified in a real browser on the FEN above
     validations:
-      required: true
+      required: false
   - type: textarea
     id: context
     attributes:

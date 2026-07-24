@@ -1,11 +1,11 @@
 name: Close Linked Issue On Merge
 
-# Post-merge hygiene for the agent issue workflow.
+# Post-merge issue hygiene.
 #
 # When a PR is merged, this finds the linked issue(s) — from the PR body's
 # closing keywords ("Closes #N") and/or the `issue-<N>-slug` branch name —
-# strips the agent `status: *` workflow labels, and (if still open) closes the
-# issue as completed.
+# strips any `status: *` triage labels, and (if still open) closes the issue as
+# completed.
 #
 # PRs in this repo target `main` (the default branch), so GitHub's "Closes #N"
 # keyword already auto-closes the linked issue on merge; the value this adds is
@@ -45,7 +45,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Agent workflow status labels that should not remain on a resolved issue.
+          # Triage status labels that should not remain on a resolved issue.
           STATUS_LABELS=("status: need plan" "status: ready" "status: in-progress" "status: in-review" "status: follow up" "status: agent approved")
 
           # 1) Issue numbers from PR-body closing keywords (GitHub's set).

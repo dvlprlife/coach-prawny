@@ -43,7 +43,7 @@ Thumbs.db
 *.swo
 *~
 
-# Claude Code (per-machine settings; agent definitions stay tracked)
+# Claude Code per-machine settings
 .claude/settings.local.json
 
 # Local deploy runbook. wrangler.jsonc (the config) IS tracked because Workers

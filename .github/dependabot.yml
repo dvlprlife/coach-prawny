@@ -1,8 +1,7 @@
 # Dependabot keeps npm dependencies and GitHub Actions current via weekly,
-# grouped PRs. These PRs are a human-reviewed stream OUTSIDE the agent label
-# state machine — they carry only the `dependencies` label, never
-# `agent` / `status:*`, so nothing picks them up as pipeline work. All
-# Dependabot PRs run through the same build.yml CI as any other PR.
+# grouped PRs. They carry only the `dependencies` label, which keeps them
+# easy to filter out of normal triage, and they run through the same build.yml
+# CI as any other PR.
 #
 # The catch-all groups set `update-types: [minor, patch]` deliberately. A group
 # with only `patterns: ["*"]` does NOT leave majors alone — it sweeps them in,
