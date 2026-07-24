@@ -398,6 +398,16 @@ body {
 .moves.skeleton .eval { width: 46px; }
 .moves.skeleton .pv { width: 68%; }
 
+/* A pinned move keeps its arrow on the board after the pointer leaves, so which
+   row is pinned has to read even when nothing is hovered. A deep-green ring (the
+   board colour, distinct from every rank accent) plus a sticky tint reads as
+   "locked" without fighting the rank border on the left. */
+.move.pinned {
+  border-color: var(--board-green);
+  background: #f2f6f4;
+  box-shadow: 0 0 0 2px rgba(31, 77, 58, 0.3);
+}
+
 .move.rank-1:hover,
 .move.rank-1:focus-visible {
   border-color: var(--prawn);
