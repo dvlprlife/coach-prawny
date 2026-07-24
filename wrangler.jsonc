@@ -1,25 +1,29 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
+  // Static-assets-only Worker: serves the Vite build output in ./dist. No
+  // server code, so "main" is intentionally omitted. Cloudflare Pages was
+  // deprecated for new projects in April 2025; static sites deploy as a Worker
+  // with static assets instead.
+  //
+  // This replaces the @cloudflare/vite-plugin setup that Workers autoconfig
+  // generated. That plugin depends on workerd, which ships no win32-arm64
+  // binary, so it made `npm ci` fail outright on this project's primary dev
+  // machine. "directory" below is what the plugin would otherwise have supplied.
   "name": "coach-prawny",
   "compatibility_date": "2026-07-24",
   "observability": {
     "enabled": true
   },
   "assets": {
-    // NOTE: "single-page-application" serves index.html for ANY unmatched
-    // path, with a 200. That is Cloudflare's default for a Vite SPA, but this
-    // app has no client-side router, so nothing needs the fallback — and it
-    // means a missing asset is masked rather than reported. Verified live:
-    // /engine/does-not-exist.wasm returns 200 text/html. If the Stockfish
-    // binaries ever failed to build into dist/, the app would fetch HTML
-    // instead of wasm and fail confusingly. Removing this line restores real
-    // 404s.
-    "not_found_handling": "single-page-application"
+    "directory": "./dist"
+
+    // Deliberately no "not_found_handling". Autoconfig set
+    // "single-page-application", which serves index.html with a 200 for ANY
+    // unmatched path — verified live: /engine/does-not-exist.wasm came back as
+    // 200 text/html. This app has no client-side router, so nothing needs that
+    // fallback, and it would mask a missing Stockfish binary as HTML rather
+    // than a 404. Real 404s are the more useful answer here.
   },
   // Per-branch preview URLs for pull requests (enable non-production branch
   // builds in the Workers Builds dashboard settings too).
-  "preview_urls": true,
-  "compatibility_flags": [
-    "nodejs_compat"
-  ]
+  "preview_urls": true
 }
