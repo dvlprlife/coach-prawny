@@ -46,6 +46,11 @@ Thumbs.db
 # Claude Code (per-machine settings; agent definitions stay tracked)
 .claude/settings.local.json
 
+# Local deploy runbook. wrangler.jsonc (the config) IS tracked because Workers
+# Builds needs it in the repo; the step-by-step notes stay local since this repo
+# is public.
+DEPLOY.md
+
 # Backup files
 *.bak
 *.backup

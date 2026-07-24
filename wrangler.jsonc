@@ -1,0 +1,22 @@
+{
+  // Static-assets-only Worker: serves the Vite build output in ./dist.
+  // No server code, so "main" is intentionally omitted. Cloudflare Pages was
+  // deprecated for new projects in April 2025; static sites deploy as a Worker
+  // with static assets instead.
+  "name": "coach-prawny",
+  "compatibility_date": "2026-07-23",
+  "assets": {
+    "directory": "./dist"
+
+    // Deliberately no "not_found_handling". This app is a single page with no
+    // client-side router, so there are no deep links a fallback would rescue.
+    // The tempting setting is "single-page-application", but it serves
+    // index.html for ANY unmatched path — including a missing /engine/*.wasm,
+    // which would then arrive as HTML with a 200 instead of failing loudly.
+    // Given the engine is 7 MB of binary served from public/ and regenerated
+    // at build time, a real 404 is the more useful answer.
+  },
+  // Per-branch preview URLs for pull requests (enable non-production branch
+  // builds in the Workers Builds dashboard settings too).
+  "preview_urls": true
+}
