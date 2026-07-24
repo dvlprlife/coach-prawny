@@ -11,7 +11,7 @@
 // plus a second set drawn locally when hovering a piece on the board (its own
 // legal destinations, play mode only).
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Chessboard, defaultArrowOptions } from "react-chessboard";
 import type { PieceDropHandlerArgs, SquareHandlerArgs } from "react-chessboard";
 import { Chess } from "chess.js";
@@ -160,10 +160,14 @@ export function BoardInput({
   const [mode, setMode] = useState<EditMode>("play");
   const [orientation, setOrientation] = useState<BoardOrientation>("white");
   const [copied, setCopied] = useState(false);
-  const [pieceMoveArrows, setPieceMoveArrows] = useState<BoardArrow[]>([]);
-  const [squarePressureArrows, setSquarePressureArrows] = useState<BoardArrow[]>(
-    []
-  );
+  // Which square's arrows to show. A pinned square (set by right-clicking) wins:
+  // once set, its arrows stay on - and its cell stays tinted (see squareStyles) -
+  // until it's unpinned or another square is pinned; hovering the board doesn't
+  // disturb them. Hovering only previews a square's arrows when nothing is
+  // pinned. (The Best-moves list keeps hover-on-top precedence; the board pin is
+  // stickier because you're often mousing over the board to read it.)
+  const [hoveredSquare, setHoveredSquare] = useState<Square | null>(null);
+  const [pinnedSquare, setPinnedSquare] = useState<Square | null>(null);
   const [showPressure, setShowPressure] = useState(true);
 
   const sideToMove = getSideToMove(fen);
@@ -193,17 +197,91 @@ export function BoardInput({
   const latestRef = useRef({ mode, fen });
   latestRef.current = { mode, fen };
 
-  // Shades the last move's squares regardless of hover, same convention as
-  // most chess UIs. `lastMove` reflects whatever position is displayed - a
-  // fresh move, or one reached via the move log's back/forward buttons.
-  // The tint is translucent (see --last-move) so the square's own light/dark
-  // colour still reads through it.
-  const lastMoveStyles = lastMove
-    ? {
-        [lastMove.from]: { backgroundColor: "var(--last-move)" },
-        [lastMove.to]: { backgroundColor: "var(--last-move)" },
+  // The board's hover/pin arrows: a piece's legal moves (blue when it's that
+  // side's turn, gray when previewing the other side's piece) plus the pressure
+  // on the square. Drawn for whichever square is "active": the PINNED square wins
+  // whenever one is set, so its arrows stay put until it's unpinned or another
+  // square is pinned - moving the pointer around the board doesn't disturb them.
+  // Only when nothing is pinned does hovering a square preview its arrows.
+  // Recomputed from the live FEN so it always matches the board in front of you.
+  // Play mode only: setup mode has no rules to derive moves or pressure from.
+  const { pieceMoveArrows, squarePressureArrows } = useMemo<{
+    pieceMoveArrows: BoardArrow[];
+    squarePressureArrows: BoardArrow[];
+  }>(() => {
+    const square = pinnedSquare ?? hoveredSquare;
+    const none = {
+      pieceMoveArrows: [] as BoardArrow[],
+      squarePressureArrows: [] as BoardArrow[],
+    };
+    if (!square || mode !== "play") return none;
+    try {
+      const chess = new Chess(fen);
+      const piece = chess.get(square);
+
+      // Empty square: nothing is standing there to move, so there are no move
+      // arrows - and no piece colour to read "friendly" from either. The side
+      // to move stands in, answering "if I played something onto this square,
+      // what could take it, and what of mine would recapture?"
+      if (!piece) {
+        return {
+          pieceMoveArrows: [],
+          squarePressureArrows: pressureArrows(chess, square, chess.turn()),
+        };
       }
-    : {};
+
+      const isSideToMove = piece.color === chess.turn();
+      // Previewing an off-turn piece needs a position with ITS colour to move.
+      // Built by reloading a side-flipped FEN rather than calling
+      // chess.setTurn(): setTurn is implemented as a null move, and chess.js
+      // refuses a null move while the side to move is in check ("Null move not
+      // allowed when in check"). So hovering an enemy piece during a check used
+      // to throw and clear every arrow - the board just went blank on exactly
+      // the positions where you most want to look around. Loading the flipped
+      // FEN has no such restriction; setSideToMove also drops the en passant
+      // target, which would otherwise fail validation on the wrong rank.
+      const view = isSideToMove
+        ? chess
+        : new Chess(setSideToMove(fen, piece.color));
+      const moves = view.moves({ square, verbose: true });
+      const color = isSideToMove
+        ? LEGAL_MOVE_ARROW_COLOR
+        : LEGAL_MOVE_ARROW_COLOR_OFF_TURN;
+      return {
+        pieceMoveArrows: moves.map((m) => [m.from, m.to, color] as BoardArrow),
+        // Occupied square: friendly is this piece's own colour, so the arrows
+        // answer "what can take this piece, and what would recapture" regardless
+        // of whose turn it actually is.
+        squarePressureArrows: pressureArrows(chess, square, piece.color),
+      };
+    } catch {
+      return none;
+    }
+  }, [hoveredSquare, pinnedSquare, fen, mode]);
+
+  // A pinned square belongs to the position it was set on; drop it on any board
+  // change so its arrows can't linger onto a position where the piece has moved
+  // or vanished. (The Best-moves pin clears the same way.)
+  useEffect(() => {
+    setPinnedSquare(null);
+  }, [fen]);
+
+  // Square tints, all sharing the translucent --last-move colour so the square's
+  // own light/dark shade still reads through:
+  //  - the last move's from/to squares (regardless of hover, same convention as
+  //    most chess UIs; `lastMove` reflects whatever position is displayed - a
+  //    fresh move, or one reached via the move log's back/forward buttons), and
+  //  - the pinned square, so which cell is locked reads at a glance rather than
+  //    only from its arrows. Gated on play mode to stay in step with the pin's
+  //    arrows, which also only show there.
+  const squareStyles: Record<string, React.CSSProperties> = {};
+  if (lastMove) {
+    squareStyles[lastMove.from] = { backgroundColor: "var(--last-move)" };
+    squareStyles[lastMove.to] = { backgroundColor: "var(--last-move)" };
+  }
+  if (pinnedSquare && mode === "play") {
+    squareStyles[pinnedSquare] = { backgroundColor: "var(--last-move)" };
+  }
 
   // Keep the FEN input box in sync when the position changes from elsewhere
   // (drag, toggle, recognition). Controlled but reconciled on external change.
@@ -361,63 +439,35 @@ export function BoardInput({
     return true;
   }
 
-  // ---- hover-to-show-legal-moves (play mode only; setup mode has no rules) ----
-  // Shows the hovered piece's moves even when it's not that color's turn, by
-  // switching the position's active color before asking chess.js for moves -
-  // this is a "what can this piece do" preview, not a claim it can move now.
-  // Version 5 passes an object ({ piece, square }) where 4 passed the square
-  // string. The piece it hands over is ignored: chess.get below reads the same
-  // thing from the position we are about to reason with anyway, and mixing the
-  // two sources would risk them disagreeing.
-  function onMouseOverSquare({ square: hovered }: SquareHandlerArgs) {
-    if (mode !== "play") return;
-    const square = hovered as Square;
-    try {
-      const chess = new Chess(fen);
-      const piece = chess.get(square);
-
-      // Empty square: nothing is standing there to move, so there are no move
-      // arrows - and no piece colour to read "friendly" from either. The side
-      // to move stands in, answering "if I played something onto this square,
-      // what could take it, and what of mine would recapture?"
-      if (!piece) {
-        setPieceMoveArrows([]);
-        setSquarePressureArrows(pressureArrows(chess, square, chess.turn()));
-        return;
-      }
-
-      const isSideToMove = piece.color === chess.turn();
-      // Previewing an off-turn piece needs a position with ITS colour to move.
-      // Built by reloading a side-flipped FEN rather than calling
-      // chess.setTurn(): setTurn is implemented as a null move, and chess.js
-      // refuses a null move while the side to move is in check ("Null move not
-      // allowed when in check"). So hovering an enemy piece during a check used
-      // to throw and clear every arrow - the board just went blank on exactly
-      // the positions where you most want to look around. Loading the flipped
-      // FEN has no such restriction; setSideToMove also drops the en passant
-      // target, which would otherwise fail validation on the wrong rank.
-      const view = isSideToMove
-        ? chess
-        : new Chess(setSideToMove(fen, piece.color));
-      const moves = view.moves({ square, verbose: true });
-      const color = isSideToMove
-        ? LEGAL_MOVE_ARROW_COLOR
-        : LEGAL_MOVE_ARROW_COLOR_OFF_TURN;
-      setPieceMoveArrows(moves.map((m) => [m.from, m.to, color] as BoardArrow));
-
-      // Occupied square: friendly is this piece's own colour, so the arrows
-      // answer "what can take this piece, and what would recapture" regardless
-      // of whose turn it actually is.
-      setSquarePressureArrows(pressureArrows(chess, square, piece.color));
-    } catch {
-      setPieceMoveArrows([]);
-      setSquarePressureArrows([]);
-    }
+  // ---- hover / click to show a square's arrows (play mode only) ----
+  // Hover just records which square the pointer is on; the arrows themselves are
+  // derived in the useMemo above (which also handles the off-turn preview and
+  // the empty-square pressure case). Version 5 passes { piece, square }; the
+  // piece it hands over is ignored - the memo reads it back from the position it
+  // reasons with, and mixing the two sources would risk them disagreeing.
+  function onMouseOverSquare({ square }: SquareHandlerArgs) {
+    setHoveredSquare(square as Square);
   }
 
   function onMouseOutSquare() {
-    setPieceMoveArrows([]);
-    setSquarePressureArrows([]);
+    setHoveredSquare(null);
+  }
+
+  // RIGHT-click a square (or the piece on it) to PIN its arrows so they stay
+  // after the pointer leaves; right-click the same square again to unpin, or a
+  // different one to move the pin. No square highlight - the arrows are the whole
+  // signal. Play mode only, to match the hover arrows.
+  //
+  // Right-click, deliberately, not left: the left button is owned by dnd-kit's
+  // drag (dragActivationDistance is 1px, so a real left click on a piece becomes
+  // a drag and never arrives as a click). The right button never drags a piece,
+  // so onSquareRightClick fires once for pieces AND empty squares alike - one
+  // clean handler, no drag ambiguity. react-chessboard already preventDefaults
+  // the context menu and only fires this on a right *click* (a right *drag* still
+  // draws a user arrow), so the two don't collide.
+  function onSquareRightClick({ square }: SquareHandlerArgs) {
+    if (mode !== "play") return;
+    setPinnedSquare((prev) => (prev === square ? null : (square as Square)));
   }
 
   // ---- recognition (stub) ----
@@ -525,6 +575,7 @@ export function BoardInput({
             onPieceDrop: handlePieceDrop,
             onMouseOverSquare,
             onMouseOutSquare,
+            onSquareRightClick,
             // Deliberately constant, not `mode === "setup"`. Version 5 only
             // uses this to decide whether to constrain the drag inside the
             // board; it never removes anything itself, so leaving it on and
@@ -548,7 +599,7 @@ export function BoardInput({
             ]),
             // User-drawn arrows (right-drag) - version 4's customArrowColor.
             arrowOptions: { ...defaultArrowOptions, color: "#e8663f" },
-            squareStyles: lastMoveStyles,
+            squareStyles: squareStyles,
             boardOrientation: orientation,
             // Version 5 sizes itself from CSS instead of taking a pixel
             // boardWidth, so the ResizeObserver that used to measure the

@@ -48,7 +48,14 @@ export default function App() {
     index: 0,
   });
   const fen = game.entries[game.index].fen;
+  // Two ways a suggested move becomes an arrow on the board: hovering a move
+  // row previews one transiently, and clicking a row pins one so it stays after
+  // the pointer leaves. Hover takes precedence while active (so you can preview
+  // other moves without losing the pin), and the pinned arrow shows again once
+  // you leave. Clicking the pinned row again, or clicking a different row,
+  // moves/clears the pin - see togglePin.
   const [hoveredUci, setHoveredUci] = useState<string | null>(null);
+  const [pinnedUci, setPinnedUci] = useState<string | null>(null);
   const [moveCount, setMoveCount] = useState(config.engine.multiPv);
   const [showAbout, setShowAbout] = useState(false);
 
@@ -103,6 +110,22 @@ export default function App() {
       // cursor from a prior position) - do nothing.
     }
   }
+
+  // Click a move to lock its arrow on the board; click the same one again to
+  // unlock; click a different one to move the pin to it. Playing a move (or any
+  // position change) drops the pin - see the effect below.
+  function togglePin(uci: string) {
+    setPinnedUci((prev) => (prev === uci ? null : uci));
+  }
+
+  // A pin belongs to the position it was set on. Drop it whenever the board
+  // changes underneath it - a played move, paste, setup edit, or a back/forward
+  // step - so a locked arrow can't linger onto a position where its move may
+  // not even be legal. (goBack/goForward don't route through handleFenChange,
+  // so keying this off `fen` is what covers every path.)
+  useEffect(() => {
+    setPinnedUci(null);
+  }, [fen]);
 
   function goBack() {
     setGame((g) => ({ ...g, index: Math.max(0, g.index - 1) }));
@@ -160,21 +183,24 @@ export default function App() {
     analyze(fen, moveCount);
   }, [fen, moveCount, analyze]);
 
-  // Translate the hovered UCI move (e.g. "e2e4") into a board arrow tuple.
-  // Look up its rank so the arrow color matches the move's ranking.
+  // Translate the active UCI move (e.g. "e2e4") into a board arrow tuple. The
+  // hovered move wins while the pointer is on a row; otherwise the pinned one
+  // shows. Look up its rank so the arrow color matches the move's ranking.
   const arrows = useMemo<BoardArrow[]>(() => {
-    if (!hoveredUci) return [];
+    const activeUci = hoveredUci ?? pinnedUci;
+    if (!activeUci) return [];
     // Only draw a move that belongs to the position currently on the board.
     // React doesn't fire onMouseLeave when an element unmounts under a still
     // cursor, so stepping the history with the pointer parked on a move would
     // otherwise leave `hoveredUci` set and paint the OLD position's arrow - a
     // move that may not even be legal here - until the mouse happens to move.
-    const ranked = result?.moves.find((m) => m.move === hoveredUci);
+    // (The pin is dropped on every position change, so it can't go stale.)
+    const ranked = result?.moves.find((m) => m.move === activeUci);
     if (!ranked) return [];
-    const from = hoveredUci.slice(0, 2) as Square;
-    const to = hoveredUci.slice(2, 4) as Square;
+    const from = activeUci.slice(0, 2) as Square;
+    const to = activeUci.slice(2, 4) as Square;
     return [[from, to, ARROW_COLORS[ranked.rank] ?? FALLBACK_ARROW_COLOR]];
-  }, [hoveredUci, result]);
+  }, [hoveredUci, pinnedUci, result]);
 
   return (
     <div className="app">
@@ -210,6 +236,8 @@ export default function App() {
               error={error}
               onHoverMove={setHoveredUci}
               onPlayMove={playMove}
+              onTogglePin={togglePin}
+              pinnedUci={pinnedUci}
               moveCount={moveCount}
               onMoveCountChange={setMoveCount}
             />

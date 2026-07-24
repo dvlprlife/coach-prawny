@@ -1,10 +1,12 @@
-// RIGHT PANE. Ranked top-N moves with evaluation. Hovering OR single-clicking a
-// move calls onHoverMove with its UCI string so the parent can draw an arrow on
-// the board (a click matters on touch, where there is no hover); leaving clears
-// it (onHoverMove(null)). DOUBLE-clicking calls onPlayMove to play it onto the
-// board. For the keyboard the split maps the same way: focusing a row shows the
-// arrow (the display gesture), and Enter/Space commits the move (the accessible
-// equivalent of a double-click).
+// RIGHT PANE. Ranked top-N moves with evaluation. Hovering a move calls
+// onHoverMove with its UCI string so the parent can draw a transient arrow on
+// the board; leaving clears it (onHoverMove(null)). Single-clicking a move
+// calls onTogglePin to LOCK that arrow on so it persists after the pointer
+// leaves - clicking the pinned move again unpins it, clicking a different move
+// moves the pin (pinnedUci says which one is currently pinned). DOUBLE-clicking
+// calls onPlayMove to play the move onto the board. For the keyboard: focusing
+// a row shows the arrow (the display gesture) and Enter/Space commits the move
+// (the accessible equivalent of a double-click).
 
 import type { AnalysisResult, EngineMove } from "../config/types";
 
@@ -16,6 +18,8 @@ interface MoveListProps {
   error: string | null;
   onHoverMove?: (uci: string | null) => void;
   onPlayMove?: (uci: string) => void;
+  onTogglePin?: (uci: string) => void;
+  pinnedUci?: string | null;
   moveCount: number;
   onMoveCountChange: (count: number) => void;
 }
@@ -76,6 +80,8 @@ export function MoveList({
   error,
   onHoverMove,
   onPlayMove,
+  onTogglePin,
+  pinnedUci,
   moveCount,
   onMoveCountChange,
 }: MoveListProps) {
@@ -112,19 +118,24 @@ export function MoveList({
 
       {result && result.moves.length > 0 && (
         <ol className="moves">
-          {result.moves.map((m) => (
+          {result.moves.map((m) => {
+            const pinned = pinnedUci === m.move;
+            const label = m.san ?? m.move;
+            return (
             <li
               key={m.rank}
-              className={`move rank-${m.rank}`}
+              className={`move rank-${m.rank}${pinned ? " pinned" : ""}`}
               onMouseEnter={() => onHoverMove?.(m.move)}
               onMouseLeave={() => onHoverMove?.(null)}
               onFocus={() => onHoverMove?.(m.move)}
               onBlur={() => onHoverMove?.(null)}
-              // A single click only previews the arrow (onHoverMove is
-              // idempotent with hover, so this is a no-op with a mouse but the
-              // only way to preview on touch). Playing is deliberately gated
-              // behind a double-click so a stray click can't alter the game.
-              onClick={() => onHoverMove?.(m.move)}
+              // A single click pins/unpins this move's arrow (toggle handled in
+              // the parent). It's a deliberate lock, not a play - playing is
+              // gated behind the double-click so a stray click can't alter the
+              // game. On a fast double-click the two clicks toggle the pin an
+              // even number of times, so it lands back where it started before
+              // the play, which then drops it anyway.
+              onClick={() => onTogglePin?.(m.move)}
               onDoubleClick={() => onPlayMove?.(m.move)}
               onKeyDown={(e) => {
                 // Enter/Space commit the focused move - the keyboard equivalent
@@ -137,11 +148,16 @@ export function MoveList({
                 }
               }}
               role="button"
-              title={`Double-click to play ${m.san ?? m.move}`}
+              aria-pressed={pinned}
+              title={
+                pinned
+                  ? `${label} pinned - click to unpin, double-click to play`
+                  : `Click to pin ${label}, double-click to play`
+              }
               tabIndex={0}
             >
               <span className="rank">{m.rank}</span>
-              <span className="san">{m.san ?? m.move}</span>
+              <span className="san">{label}</span>
               <span className="eval" title={describeEval(m)}>
                 {formatEval(m)}
               </span>
@@ -159,7 +175,8 @@ export function MoveList({
                   : " "}
               </span>
             </li>
-          ))}
+            );
+          })}
           {/* Pad out to the requested count. A position with fewer legal moves
               than "Show N" (a king with three squares, say) would otherwise
               render a shorter panel than both the placeholders that preceded it
