@@ -1,12 +1,14 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 // Multi-threaded Stockfish WASM needs cross-origin isolation (COOP/COEP).
 // These headers enable it in `npm run dev`. Without them the engine falls back
 // to single-threaded (works, just slower). For production on Cloudflare Pages,
 // the same headers are set via public/_headers.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), cloudflare()],
   server: {
     headers: {
       "Cross-Origin-Opener-Policy": "same-origin",

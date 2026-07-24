@@ -8,8 +8,9 @@
     "dev": "vite",
     "prebuild": "npm run sync-engine",
     "build": "tsc && vite build",
-    "preview": "vite preview",
-    "sync-engine": "node scripts/sync-engine.mjs"
+    "preview": "npm run build && wrangler dev",
+    "sync-engine": "node scripts/sync-engine.mjs",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "chess.js": "^1.4.0",
@@ -19,10 +20,12 @@
     "stockfish": "^18.0.8"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.47.0",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.4",
     "typescript": "^7.0.2",
-    "vite": "^8.1.5"
+    "vite": "^8.1.5",
+    "wrangler": "^4.114.0"
   }
 }
