@@ -1,7 +1,10 @@
-// RIGHT PANE. Ranked top-N moves with evaluation. Hovering a move calls
-// onHoverMove with its UCI string so the parent can draw an arrow on the board;
-// leaving clears it (onHoverMove(null)). Clicking (or Enter/Space on a focused
-// move) calls onPlayMove to play it onto the board.
+// RIGHT PANE. Ranked top-N moves with evaluation. Hovering OR single-clicking a
+// move calls onHoverMove with its UCI string so the parent can draw an arrow on
+// the board (a click matters on touch, where there is no hover); leaving clears
+// it (onHoverMove(null)). DOUBLE-clicking calls onPlayMove to play it onto the
+// board. For the keyboard the split maps the same way: focusing a row shows the
+// arrow (the display gesture), and Enter/Space commits the move (the accessible
+// equivalent of a double-click).
 
 import type { AnalysisResult, EngineMove } from "../config/types";
 
@@ -117,18 +120,24 @@ export function MoveList({
               onMouseLeave={() => onHoverMove?.(null)}
               onFocus={() => onHoverMove?.(m.move)}
               onBlur={() => onHoverMove?.(null)}
-              onClick={() => onPlayMove?.(m.move)}
+              // A single click only previews the arrow (onHoverMove is
+              // idempotent with hover, so this is a no-op with a mouse but the
+              // only way to preview on touch). Playing is deliberately gated
+              // behind a double-click so a stray click can't alter the game.
+              onClick={() => onHoverMove?.(m.move)}
+              onDoubleClick={() => onPlayMove?.(m.move)}
               onKeyDown={(e) => {
-                // Enter/Space play the focused move - the keyboard equivalent
-                // of a click for a role="button" row. preventDefault stops
-                // Space from also scrolling the panel.
+                // Enter/Space commit the focused move - the keyboard equivalent
+                // of a double-click for a role="button" row (focus already drew
+                // the preview arrow). preventDefault stops Space from also
+                // scrolling the panel.
                 if (e.key === "Enter" || e.key === " ") {
                   e.preventDefault();
                   onPlayMove?.(m.move);
                 }
               }}
               role="button"
-              title={`Play ${m.san ?? m.move}`}
+              title={`Double-click to play ${m.san ?? m.move}`}
               tabIndex={0}
             >
               <span className="rank">{m.rank}</span>
