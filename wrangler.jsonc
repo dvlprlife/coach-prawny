@@ -1,22 +1,25 @@
 {
-  // Static-assets-only Worker: serves the Vite build output in ./dist.
-  // No server code, so "main" is intentionally omitted. Cloudflare Pages was
-  // deprecated for new projects in April 2025; static sites deploy as a Worker
-  // with static assets instead.
+  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "coach-prawny",
-  "compatibility_date": "2026-07-23",
+  "compatibility_date": "2026-07-24",
+  "observability": {
+    "enabled": true
+  },
   "assets": {
-    "directory": "./dist"
-
-    // Deliberately no "not_found_handling". This app is a single page with no
-    // client-side router, so there are no deep links a fallback would rescue.
-    // The tempting setting is "single-page-application", but it serves
-    // index.html for ANY unmatched path — including a missing /engine/*.wasm,
-    // which would then arrive as HTML with a 200 instead of failing loudly.
-    // Given the engine is 7 MB of binary served from public/ and regenerated
-    // at build time, a real 404 is the more useful answer.
+    // NOTE: "single-page-application" serves index.html for ANY unmatched
+    // path, with a 200. That is Cloudflare's default for a Vite SPA, but this
+    // app has no client-side router, so nothing needs the fallback — and it
+    // means a missing asset is masked rather than reported. Verified live:
+    // /engine/does-not-exist.wasm returns 200 text/html. If the Stockfish
+    // binaries ever failed to build into dist/, the app would fetch HTML
+    // instead of wasm and fail confusingly. Removing this line restores real
+    // 404s.
+    "not_found_handling": "single-page-application"
   },
   // Per-branch preview URLs for pull requests (enable non-production branch
   // builds in the Workers Builds dashboard settings too).
-  "preview_urls": true
+  "preview_urls": true,
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
 }
