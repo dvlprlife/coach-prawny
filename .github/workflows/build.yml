@@ -75,6 +75,17 @@ jobs:
         run: |
           test -s dist/_headers
           echo "ok: dist/_headers"
+      # about.html is generated from the About component after the bundle is
+      # built (scripts/build-about.mjs). Nothing references it at compile time,
+      # and an empty or unstyled page would still deploy and still return 200,
+      # so assert it has content and picked up the hashed stylesheet.
+      - name: Verify the About page was generated
+        shell: bash
+        run: |
+          test -s dist/about.html
+          grep -q 'rel="stylesheet"' dist/about.html
+          grep -q '<h2>' dist/about.html
+          echo "ok: dist/about.html"
 
   # Fails a PR that introduces a dependency with a known vulnerability, which
   # Dependabot alone only tells you about after the fact. Needs the dependency
