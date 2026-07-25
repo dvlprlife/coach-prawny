@@ -170,6 +170,15 @@ export function BoardInput({
   const [pinnedSquare, setPinnedSquare] = useState<Square | null>(null);
   const [showPressure, setShowPressure] = useState(true);
 
+  // Undo/redo history for Set up mode only. Play mode already has one - the move
+  // log - but a Set up edit deliberately resets that (it's a new position, not a
+  // continuation), so free-placement edits had nothing to step back through.
+  // These stacks hold the positions before/after the current one; they're kept
+  // separate from the move log so they never leak into the game's PGN. A fresh
+  // history starts each time you enter Set up (see the effect on `mode`).
+  const [setupPast, setSetupPast] = useState<Fen[]>([]);
+  const [setupFuture, setSetupFuture] = useState<Fen[]>([]);
+
   const sideToMove = getSideToMove(fen);
   const castling = getCastlingRights(fen);
 
@@ -265,6 +274,83 @@ export function BoardInput({
   useEffect(() => {
     setPinnedSquare(null);
   }, [fen]);
+
+  // ---- Set up mode undo/redo ----
+  // Record every position change made while in Set up mode so it can be stepped
+  // back. Watching the committed `fen` rather than hooking each edit site means
+  // piece drops, off-board removals and the side/castling toggles are all
+  // covered uniformly. `setupNavRef` flags the changes that undo/redo themselves
+  // make, so those aren't re-recorded as fresh edits.
+  const prevFenRef = useRef(fen);
+  const setupNavRef = useRef(false);
+  useEffect(() => {
+    const prev = prevFenRef.current;
+    if (fen === prev) return;
+    prevFenRef.current = fen;
+    if (setupNavRef.current) {
+      setupNavRef.current = false;
+      return;
+    }
+    if (mode !== "setup") return;
+    setSetupPast((p) => [...p, prev]);
+    setSetupFuture([]);
+  }, [fen, mode]);
+
+  // A fresh history each time the mode changes, so entering Set up starts clean
+  // and leaving it doesn't leave a stale stack pointing at old positions.
+  useEffect(() => {
+    setSetupPast([]);
+    setSetupFuture([]);
+  }, [mode]);
+
+  const canUndoSetup = mode === "setup" && setupPast.length > 0;
+  const canRedoSetup = mode === "setup" && setupFuture.length > 0;
+
+  function undoSetup() {
+    if (!canUndoSetup) return;
+    const prev = setupPast[setupPast.length - 1];
+    setSetupPast(setupPast.slice(0, -1));
+    setSetupFuture([fen, ...setupFuture]);
+    setupNavRef.current = true; // the resulting fen change is navigation, not an edit
+    commitFen(prev);
+  }
+
+  function redoSetup() {
+    if (!canRedoSetup) return;
+    const next = setupFuture[0];
+    setSetupFuture(setupFuture.slice(1));
+    setSetupPast([...setupPast, fen]);
+    setupNavRef.current = true;
+    commitFen(next);
+  }
+
+  // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or +Y) drive the same undo/redo while in
+  // Set up mode. Bound to the window so it works without focusing a control, but
+  // held off while typing in the FEN box. The handler closes over live state, so
+  // it routes through refs kept current each render (same trick as onPaste).
+  const undoRef = useRef(undoSetup);
+  const redoRef = useRef(redoSetup);
+  undoRef.current = undoSetup;
+  redoRef.current = redoSetup;
+  useEffect(() => {
+    if (mode !== "setup") return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        undoRef.current();
+      } else if ((key === "z" && e.shiftKey) || key === "y") {
+        e.preventDefault();
+        redoRef.current();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [mode]);
 
   // Square tints, all sharing the translucent --last-move colour so the square's
   // own light/dark shade still reads through:
@@ -667,6 +753,33 @@ export function BoardInput({
             Set up
           </button>
         </div>
+
+        {/* Undo/redo for free-placement edits, shown only in Set up mode - Play
+            mode already has this in the move log. Ctrl+Z / Ctrl+Shift+Z do the
+            same (see the keydown effect). The history resets on entering Set up. */}
+        {mode === "setup" && (
+          <div className="setup-undo">
+            <span>Edit history</span>
+            <button
+              type="button"
+              className="action-btn"
+              onClick={undoSetup}
+              disabled={!canUndoSetup}
+              title="Undo the last setup edit (Ctrl+Z)"
+            >
+              ↶ Undo
+            </button>
+            <button
+              type="button"
+              className="action-btn"
+              onClick={redoSetup}
+              disabled={!canRedoSetup}
+              title="Redo the last undone edit (Ctrl+Shift+Z)"
+            >
+              ↷ Redo
+            </button>
+          </div>
+        )}
 
         {/* Disabled in setup mode rather than merely inert: hover arrows are a
             play-mode feature (setup mode has no rules to derive them from), so

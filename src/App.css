@@ -186,7 +186,8 @@ body {
 .mode-toggle,
 .side-toggle,
 .castling-toggle,
-.pressure-toggle {
+.pressure-toggle,
+.setup-undo {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -195,7 +196,8 @@ body {
 .mode-toggle span,
 .side-toggle span,
 .castling-toggle span,
-.pressure-toggle span { color: var(--muted); margin-right: 4px; }
+.pressure-toggle span,
+.setup-undo span { color: var(--muted); margin-right: 4px; }
 .mode-toggle button,
 .side-toggle button,
 .castling-toggle button,

@@ -33,6 +33,11 @@ export function About({ onClose }: AboutProps) {
           <strong>castling</strong> rights for each side. A castling button is
           disabled when that king and rook aren't both on their home squares.
         </li>
+        <li>
+          Made a mistake? In Set&nbsp;up mode, <strong>Undo</strong> /{" "}
+          <strong>Redo</strong> (or <strong>Ctrl+Z</strong> /{" "}
+          <strong>Ctrl+Shift+Z</strong>) step back and forth through your edits.
+        </li>
       </ul>
 
       <h2>Reading the best moves</h2>
