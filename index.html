@@ -18,10 +18,15 @@
 
     <!-- Link previews. A tool like this spreads by someone pasting the URL into
          a chess forum or chat, where a bare link with no card is easy to scroll
-         past. No og:image yet - social crawlers want a PNG/JPG of at least
-         200x200 and won't take the SVG favicon, so pointing at it would break
-         the card rather than fill it. Add a 1200x630 PNG and an og:image tag
-         together, or not at all. -->
+         past.
+         og:image must be an ABSOLUTE url - crawlers fetch it without a page to
+         resolve a relative path against - and a raster format, since every
+         social crawler rejects SVG (which is why favicon.svg is no use here).
+         The declared size is the image's real 1034x580 rather than the 1200x630
+         ideal: platforms that enforce 1.91:1 or 2:1 crop the top and bottom,
+         which this image survives because the board is centred and the prawn
+         silhouettes sit at the left and right edges. Stating the true size lets
+         a crawler reserve the right box instead of guessing. -->
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://coachprawny.com/" />
     <meta property="og:site_name" content="Coach Prawny" />
@@ -30,12 +35,21 @@
       property="og:description"
       content="Chess position in, top moves out. Stockfish runs in your browser, ranks the best replies, and marks every move you play best, mistake or blunder."
     />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:image" content="https://coachprawny.com/og.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1034" />
+    <meta property="og:image:height" content="580" />
+    <meta
+      property="og:image:alt"
+      content="A chess board mid-game, its pieces drawn as prawns, against a blue and coral backdrop."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Coach Prawny — chess position analysis" />
     <meta
       name="twitter:description"
       content="Chess position in, top moves out. Stockfish runs in your browser, ranks the best replies, and marks every move you play best, mistake or blunder."
     />
+    <meta name="twitter:image" content="https://coachprawny.com/og.png" />
 
     <!-- Styles the pre-mount content below. Inline because it has to apply
          before anything else loads, and it is thrown away on mount. -->
