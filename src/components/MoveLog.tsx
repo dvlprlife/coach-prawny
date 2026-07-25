@@ -5,6 +5,12 @@
 
 import { useState } from "react";
 import { getSideToMove, STARTING_FEN } from "../engine/fen";
+import {
+  assessEntry,
+  QUALITY_GLYPH,
+  QUALITY_LABEL,
+  type MoveAssessment,
+} from "../engine/moveQuality";
 import type { MoveLogEntry } from "../config/types";
 
 interface MoveLogProps {
@@ -14,10 +20,18 @@ interface MoveLogProps {
   onForward: () => void;
 }
 
+interface LogCell {
+  san: string;
+  index: number;
+  // null when either side of the comparison hasn't been analyzed yet, which is
+  // the signal to render the move with no annotation at all.
+  assessment: MoveAssessment | null;
+}
+
 interface LogRow {
   number: number;
-  white?: { san: string; index: number };
-  black?: { san: string; index: number };
+  white?: LogCell;
+  black?: LogCell;
 }
 
 // Groups the flat entry list into numbered white/black pairs. Uses the FEN's
@@ -31,21 +45,46 @@ function buildRows(entries: MoveLogEntry[]): LogRow[] {
   let moveNumber = parseInt(entries[0].fen.split(/\s+/)[5] ?? "1", 10) || 1;
 
   for (let i = 1; i < entries.length; i++) {
-    const san = entries[i].san ?? "";
+    const cell: LogCell = {
+      san: entries[i].san ?? "",
+      index: i,
+      assessment: assessEntry(entries[i - 1], entries[i]),
+    };
     if (sideToMove === "w") {
-      rows.push({ number: moveNumber, white: { san, index: i } });
+      rows.push({ number: moveNumber, white: cell });
     } else {
       const last = rows[rows.length - 1];
       if (last && last.number === moveNumber && !last.black) {
-        last.black = { san, index: i };
+        last.black = cell;
       } else {
-        rows.push({ number: moveNumber, black: { san, index: i } });
+        rows.push({ number: moveNumber, black: cell });
       }
       moveNumber++;
     }
     sideToMove = sideToMove === "w" ? "b" : "w";
   }
   return rows;
+}
+
+// "Mistake - gave up 1.30" reads better than a bare centipawn count, and the
+// pawn unit matches how the evaluations are shown in the Best-moves panel.
+function assessmentTitle(assessment: MoveAssessment): string {
+  const label = QUALITY_LABEL[assessment.quality];
+  if (assessment.lossCp <= 0) return label;
+  return `${label} - gave up ${(assessment.lossCp / 100).toFixed(2)}`;
+}
+
+// The annotation shown after a move. "good" has an empty glyph on purpose:
+// marking every unremarkable move would drown out the ones worth seeing.
+function Annotation({ assessment }: { assessment: MoveAssessment | null }) {
+  if (!assessment) return null;
+  const glyph = QUALITY_GLYPH[assessment.quality];
+  if (!glyph) return null;
+  return (
+    <span className={`quality ${assessment.quality}`} title={assessmentTitle(assessment)}>
+      {glyph}
+    </span>
+  );
 }
 
 // Standard PGN movetext ("1. e4 e5 2. Nf3 ..."), with a "N..." lead-in when
@@ -130,9 +169,11 @@ export function MoveLog({ entries, currentIndex, onBack, onForward }: MoveLogPro
               <span className="num">{row.number}.</span>
               <span className={row.white?.index === currentIndex ? "san current" : "san"}>
                 {row.white?.san ?? ""}
+                {row.white ? <Annotation assessment={row.white.assessment} /> : null}
               </span>
               <span className={row.black?.index === currentIndex ? "san current" : "san"}>
                 {row.black?.san ?? ""}
+                {row.black ? <Annotation assessment={row.black.assessment} /> : null}
               </span>
             </li>
           ))}

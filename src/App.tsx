@@ -183,6 +183,41 @@ export default function App() {
     analyze(fen, moveCount);
   }, [fen, moveCount, analyze]);
 
+  // Record each position's evaluation onto its own move-log entry as the
+  // analysis lands. That's what lets MoveLog judge a move: comparing the score
+  // of the position before it with the score after. Only the entry currently on
+  // the board is ever written, and only when the result actually belongs to it
+  // (a result for a different fen is stale). Returning `g` unchanged when the
+  // numbers already match is what stops this from re-rendering itself forever.
+  //
+  // A position only gets scored once it has been analyzed, so playing faster
+  // than the search completes leaves entries unscored - those moves simply go
+  // unannotated, and fill in if you step back through them later.
+  useEffect(() => {
+    if (!result || result.fen !== fen) return;
+    const best = result.moves.find((m) => m.rank === 1);
+    if (!best) return;
+    setGame((g) => {
+      const entry = g.entries[g.index];
+      if (!entry || entry.fen !== result.fen) return g;
+      if (
+        entry.evalCp === best.evalCp &&
+        entry.mateIn === best.mateIn &&
+        entry.bestUci === best.move
+      ) {
+        return g;
+      }
+      const entries = g.entries.slice();
+      entries[g.index] = {
+        ...entry,
+        evalCp: best.evalCp,
+        mateIn: best.mateIn,
+        bestUci: best.move,
+      };
+      return { ...g, entries };
+    });
+  }, [result, fen]);
+
   // Translate the active UCI move (e.g. "e2e4") into a board arrow tuple. The
   // hovered move wins while the pointer is on a row; otherwise the pinned one
   // shows. Look up its rank so the arrow color matches the move's ranking.
