@@ -4,10 +4,78 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>Coach Prawny — your next gambit</title>
+
+    <title>Coach Prawny — chess position analysis · your next gambit</title>
+    <meta
+      name="description"
+      content="Paste a chess position or drag the pieces and get Stockfish's top moves, ranked and evaluated - with your own moves marked best, mistake or blunder."
+    />
+    <!-- The site answers on the apex, www and (currently) plain http, all with
+         the same content. Naming one canonical URL keeps search engines from
+         splitting signals across them. -->
+    <link rel="canonical" href="https://coachprawny.com/" />
+    <meta name="theme-color" content="#1f4d3a" />
+
+    <!-- Link previews. A tool like this spreads by someone pasting the URL into
+         a chess forum or chat, where a bare link with no card is easy to scroll
+         past. No og:image yet - social crawlers want a PNG/JPG of at least
+         200x200 and won't take the SVG favicon, so pointing at it would break
+         the card rather than fill it. Add a 1200x630 PNG and an og:image tag
+         together, or not at all. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://coachprawny.com/" />
+    <meta property="og:site_name" content="Coach Prawny" />
+    <meta property="og:title" content="Coach Prawny — chess position analysis" />
+    <meta
+      property="og:description"
+      content="Chess position in, top moves out. Stockfish runs in your browser, ranks the best replies, and marks every move you play best, mistake or blunder."
+    />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Coach Prawny — chess position analysis" />
+    <meta
+      name="twitter:description"
+      content="Chess position in, top moves out. Stockfish runs in your browser, ranks the best replies, and marks every move you play best, mistake or blunder."
+    />
+
+    <!-- Styles the pre-mount content below. Inline because it has to apply
+         before anything else loads, and it is thrown away on mount. -->
+    <style>
+      .boot {
+        max-width: 34rem;
+        margin: 12vh auto;
+        padding: 0 1.5rem;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        color: #1a1a17;
+        line-height: 1.55;
+      }
+      .boot h1 { color: #1f4d3a; margin-bottom: 0.5rem; }
+      .boot-note { color: #6b6a63; font-size: 0.9rem; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Everything below is replaced the moment React mounts: createRoot
+           clears its container. It is here because the app is entirely
+           client-rendered, so without it the served HTML is an empty div -
+           which is all a crawler that doesn't run JS ever sees, and all a
+           visitor with JS disabled ever gets. Keep it a plain-language summary
+           of what the page actually does; describing anything the app doesn't
+           do would be cloaking. -->
+      <div class="boot">
+        <h1>Coach Prawny</h1>
+        <p>
+          Chess position in, top moves out. Paste a FEN or drag the pieces into
+          place and Stockfish ranks the best replies, evaluates each one, and
+          marks every move you play as best, an inaccuracy, a mistake or a
+          blunder.
+        </p>
+        <p>
+          The board editor, the move history and the engine all run in your
+          browser - nothing you enter is sent anywhere.
+        </p>
+        <p class="boot-note">Loading the board…</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
