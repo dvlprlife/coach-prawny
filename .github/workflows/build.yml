@@ -10,14 +10,25 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# The repo default is already read-only, but state it here so the job keeps the
+# narrowest scope even if that default is widened later. Nothing in this
+# workflow writes to the repo; dependency-review needs to read contents and,
+# on a PR, the diff.
+permissions:
+  contents: read
+
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
         # Windows is the primary dev platform; Linux is the deploy target
-        # (Cloudflare Pages). macOS is omitted to control private-repo Actions
-        # minutes.
+        # (Cloudflare Workers). macOS is omitted because it is neither — the
+        # repo is public now, so Actions minutes are no longer the reason. Note
+        # that adding a leg means updating the ruleset's required status checks
+        # too: the contexts are matrix-derived strings ("build (ubuntu-latest)"),
+        # so a new leg is not required-by-default and renaming one silently
+        # drops the gate.
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
 
@@ -28,10 +39,14 @@ jobs:
           node-version: '24.x'
           cache: 'npm'
       - run: npm ci
+      # Unit tests over the pure FEN helpers (src/engine/fen.test.ts). Runs
+      # before the build so a logic regression fails fast rather than after a
+      # full bundle. There is still no lint config — when one lands, add it as
+      # its own step alongside this one.
+      - name: Test (vitest)
+        run: npm test
       # `npm run build` is `tsc && vite build`, so this is the typecheck gate
-      # AND the bundle gate in one step. There is no lint config and no test
-      # suite in this repo yet — when either lands, add it as its own step
-      # above this one.
+      # AND the bundle gate in one step.
       - name: Build (tsc + vite build)
         run: npm run build
       # The Stockfish worker is served from public/engine/ rather than bundled,
@@ -60,3 +75,19 @@ jobs:
         run: |
           test -s dist/_headers
           echo "ok: dist/_headers"
+
+  # Fails a PR that introduces a dependency with a known vulnerability, which
+  # Dependabot alone only tells you about after the fact. Needs the dependency
+  # graph, which is free on public repos only — this job would be a no-op error
+  # if the repo ever went private again. PR-only: the action has no diff to
+  # review on a push.
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/dependency-review-action@v4
+        with:
+          # Block only on genuinely serious advisories, so a low-severity
+          # transitive finding doesn't wedge an unrelated PR.
+          fail-on-severity: high
