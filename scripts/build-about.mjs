@@ -31,6 +31,12 @@ const indexPath = join(distDir, "index.html");
 const outPath = join(distDir, "about.html");
 
 const SITE = "https://coachprawny.com";
+// The file has to be about.html - that is what Cloudflare Workers Assets looks
+// for - but the URL it SERVES is extensionless: a request for /about.html gets
+// a 307 to /about (verified live). So every self-reference below has to name
+// /about, or the canonical would point at a URL that immediately redirects and
+// every inbound link would cost a pointless hop.
+const PAGE_URL = `${SITE}/about`;
 const TITLE = "How Coach Prawny works — chess position analysis explained";
 const DESCRIPTION =
   "How to set up a position, read the engine's ranked moves and evaluations, " +
@@ -87,11 +93,11 @@ const html = `<!doctype html>
 
     <title>${TITLE}</title>
     <meta name="description" content="${DESCRIPTION}" />
-    <link rel="canonical" href="${SITE}/about.html" />
+    <link rel="canonical" href="${PAGE_URL}" />
     <meta name="theme-color" content="#1f4d3a" />
 
     <meta property="og:type" content="article" />
-    <meta property="og:url" content="${SITE}/about.html" />
+    <meta property="og:url" content="${PAGE_URL}" />
     <meta property="og:site_name" content="Coach Prawny" />
     <meta property="og:title" content="${TITLE}" />
     <meta property="og:description" content="${DESCRIPTION}" />

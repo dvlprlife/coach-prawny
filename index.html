@@ -73,11 +73,14 @@
           The board editor, the move history and the engine all run in your
           browser - nothing you enter is sent anywhere.
         </p>
-        <!-- Not decoration: /about.html is generated from the same component as
-             the in-app About panel, and this is the only link to it. Without a
-             link from somewhere, the page is orphaned and may never be crawled
-             at all. It also gives a JS-disabled visitor somewhere to go. -->
-        <p><a href="/about.html">How Coach Prawny works</a></p>
+        <!-- Not decoration: the About page is generated from the same component
+             as the in-app About panel, and this is the only link to it. Without
+             a link from somewhere, the page is orphaned and may never be
+             crawled at all. It also gives a JS-disabled visitor somewhere to go.
+             Extensionless on purpose - the built file is about.html, but
+             Cloudflare Workers Assets serves it at /about and 307s the .html
+             form there, so linking /about.html would cost a needless hop. -->
+        <p><a href="/about">How Coach Prawny works</a></p>
         <p class="boot-note">Loading the board…</p>
       </div>
     </div>
