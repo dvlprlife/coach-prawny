@@ -32,9 +32,20 @@ export interface RecognitionResult {
 
 // One step in the played-move history. The root entry (index 0) has no
 // `san`/`from`/`to` - it's the position the log started from, not a move.
+//
+// The eval fields describe THIS entry's position (not the move that reached
+// it), recorded from the engine's rank-1 line as each position gets analyzed.
+// They are optional because a position is only scored once it has actually
+// been analyzed - play a move faster than the search completes and the entry
+// stays unscored until you navigate back to it. moveQuality compares two
+// adjacent entries' scores to judge the move between them, so an unscored
+// entry simply means that move goes unannotated rather than mis-annotated.
 export interface MoveLogEntry {
   fen: Fen;
   san?: string;
   from?: string;
   to?: string;
+  evalCp?: number | null; // centipawns, WHITE's perspective (see analyzeEngine)
+  mateIn?: number | null; // moves to mate, negative = Black mates
+  bestUci?: string; // the engine's top move FROM this position, e.g. "e2e4"
 }

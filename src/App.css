@@ -79,6 +79,12 @@ body {
 .about ul { margin: 0 0 8px; padding-left: 20px; }
 .about li { margin: 0 0 6px; }
 .about li::marker { color: var(--rank-muted); }
+/* Match the move-log annotation colours so the About key reads as the legend
+   it is, rather than as generic bold text. */
+.about .q-best { color: var(--sage); }
+.about .q-inaccuracy { color: var(--prawn-flat); }
+.about .q-mistake { color: var(--prawn); }
+.about .q-blunder { color: var(--threat); }
 .about strong { color: var(--board-green); font-weight: 600; }
 .about a { color: var(--prawn); }
 .about .action-btn { margin-top: 16px; }
@@ -516,8 +522,26 @@ body {
   font-size: 14px;
 }
 .move-log-row .num { color: var(--muted); }
+/* The row height is fixed, so a move plus its annotation must never wrap into
+   a second line - it would be clipped rather than expand the row. */
+.move-log-row .san { white-space: nowrap; }
 .move-log-row .san.current {
   background: var(--prawn-flat-log);
   border-radius: 4px;
   font-weight: 600;
 }
+
+/* Move-quality annotations. Only the notable qualities carry a glyph at all
+   (QUALITY_GLYPH leaves "good" blank), so these read as exceptions rather than
+   decoration on every move. The colours run the same direction as the verdict:
+   sage for the good news, through prawn, to the same red used for threats
+   elsewhere on the board. */
+.move-log-row .quality {
+  margin-left: 3px;
+  font-weight: 700;
+  font-size: 13px;
+}
+.move-log-row .quality.best { color: var(--sage); }
+.move-log-row .quality.inaccuracy { color: var(--prawn-flat); }
+.move-log-row .quality.mistake { color: var(--prawn); }
+.move-log-row .quality.blunder { color: var(--threat); }

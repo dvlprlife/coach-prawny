@@ -86,6 +86,33 @@ export function About({ onClose }: AboutProps) {
         </li>
       </ul>
 
+      <h2>How your moves are judged</h2>
+      <p>
+        Moves you play are annotated in the move log by comparing the
+        evaluation before the move with the evaluation after it - how much the
+        position got worse for you, in pawns. Hover an annotation to see how
+        much was given up.
+      </p>
+      <ul>
+        <li>
+          <strong className="q-best">★</strong> the engine's own top choice, or
+          as good as; <strong className="q-inaccuracy">?!</strong> an
+          inaccuracy; <strong className="q-mistake">?</strong> a mistake;{" "}
+          <strong className="q-blunder">??</strong> a blunder. Ordinary sound
+          moves are left unmarked.
+        </li>
+        <li>
+          A move is only judged once both the position before it and the
+          position after it have been analyzed, so moves played faster than the
+          engine can keep up stay unmarked - step back through them and the
+          annotations fill in.
+        </li>
+        <li>
+          Once a game is completely won or lost, further imprecision is not
+          flagged - but giving up a forced mate always is.
+        </li>
+      </ul>
+
       <h2>Board controls</h2>
       <ul>
         <li>
