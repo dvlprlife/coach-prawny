@@ -101,9 +101,20 @@ const html = `<!doctype html>
     <meta property="og:site_name" content="Coach Prawny" />
     <meta property="og:title" content="${TITLE}" />
     <meta property="og:description" content="${DESCRIPTION}" />
-    <meta name="twitter:card" content="summary" />
+    <!-- Same card art as the home page. Absolute url and real pixel size - see
+         the longer note in index.html for why both matter. -->
+    <meta property="og:image" content="${SITE}/og.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1034" />
+    <meta property="og:image:height" content="580" />
+    <meta
+      property="og:image:alt"
+      content="A chess board mid-game, its pieces drawn as prawns, against a blue and coral backdrop."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="${TITLE}" />
     <meta name="twitter:description" content="${DESCRIPTION}" />
+    <meta name="twitter:image" content="${SITE}/og.png" />
 
     <link rel="stylesheet" href="${cssHref}" />
   </head>
