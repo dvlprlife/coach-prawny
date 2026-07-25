@@ -88,6 +88,13 @@ body {
 .about strong { color: var(--board-green); font-weight: 600; }
 .about a { color: var(--prawn); }
 .about .action-btn { margin-top: 16px; }
+/* On the standalone /about.html page the back control is a link home rather
+   than a button, so it needs the bits a <button> gets for free. */
+a.action-btn {
+  display: inline-block;
+  text-decoration: none;
+  color: var(--ink);
+}
 
 .panels {
   display: grid;

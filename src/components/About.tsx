@@ -1,11 +1,23 @@
 // A single static info panel, swapped in for the board+moves panels by a
 // button in the header. Not worth a router for one page.
+//
+// This component is ALSO the source for the standalone /about.html page:
+// scripts/build-about.mjs renders it to static HTML after the bundle is built,
+// so the explanation lives in exactly one place and cannot drift between the
+// in-app panel and the linkable page. That page has nothing to close and no
+// React to do it with, so it passes `backHref` and gets a link home instead of
+// a button. Keep this component free of hooks and browser APIs - it has to
+// render on the server too.
 
 interface AboutProps {
-  onClose: () => void;
+  // In-app: dismiss the panel. Omitted on the static page.
+  onClose?: () => void;
+  // Static page: where the "back" control should link to. When set, the
+  // control renders as an anchor rather than a button.
+  backHref?: string;
 }
 
-export function About({ onClose }: AboutProps) {
+export function About({ onClose, backHref }: AboutProps) {
   return (
     <div className="about">
       <p>
@@ -145,9 +157,15 @@ export function About({ onClose }: AboutProps) {
         same terms.
       </p>
 
-      <button type="button" className="action-btn" onClick={onClose}>
-        ← Back to the board
-      </button>
+      {backHref ? (
+        <a className="action-btn" href={backHref}>
+          ← Back to the board
+        </a>
+      ) : (
+        <button type="button" className="action-btn" onClick={onClose}>
+          ← Back to the board
+        </button>
+      )}
     </div>
   );
 }

@@ -7,7 +7,8 @@
     "predev": "npm run sync-engine",
     "dev": "vite",
     "prebuild": "npm run sync-engine",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && npm run build-about",
+    "build-about": "node scripts/build-about.mjs",
     "test": "vitest run",
     "preview": "vite preview",
     "sync-engine": "node scripts/sync-engine.mjs"
