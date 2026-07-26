@@ -21,6 +21,7 @@ import { Chess } from "chess.js";
 // it there keeps the app's own typing as strict as it was before.
 import type { Square } from "chess.js";
 import { recognizeBoard, NotImplementedError } from "../recognition/recognizeBoard";
+import { shareUrl } from "../engine/positionLink";
 import { config } from "../config/config";
 import {
   STARTING_FEN,
@@ -160,6 +161,7 @@ export function BoardInput({
   const [mode, setMode] = useState<EditMode>("play");
   const [orientation, setOrientation] = useState<BoardOrientation>("white");
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
   // Which square's arrows to show. A pinned square (set by right-clicking) wins:
   // once set, its arrows stay on - and its cell stays tinted (see squareStyles) -
   // until it's unpinned or another square is pinned; hovering the board doesn't
@@ -595,6 +597,22 @@ export function BoardInput({
     }
   }
 
+  // Copies a link that opens straight to this position. Built from the
+  // committed fen rather than read out of the address bar: App keeps the two in
+  // step, but the fen prop is the position actually on the board, and reading
+  // location here would depend on that sync having already run.
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(
+        shareUrl(fen, window.location.origin, window.location.pathname)
+      );
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 1500);
+    } catch {
+      setFenError("Couldn't copy to clipboard.");
+    }
+  }
+
   // Restores the standard starting position. Doesn't touch board mode or
   // orientation - those are view preferences, not part of the position.
   function resetBoard() {
@@ -893,6 +911,44 @@ export function BoardInput({
                 />
                 <path
                   d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            )}
+          </button>
+          <button
+            type="button"
+            className="copy-btn"
+            onClick={copyLink}
+            title={
+              linkCopied ? "Link copied!" : "Copy a link to this position"
+            }
+            aria-label="Copy a link to this position"
+          >
+            {linkCopied ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M5 12.5L10 17.5L19 7"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            ) : (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"
                   stroke="currentColor"
                   strokeWidth="2"
                   strokeLinecap="round"

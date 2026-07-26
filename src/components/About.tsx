@@ -46,6 +46,13 @@ export function About({ onClose, backHref }: AboutProps) {
           disabled when that king and rook aren't both on their home squares.
         </li>
         <li>
+          <strong>Share a position</strong> with the link button beside the FEN
+          box - it copies a link that opens straight to the board in front of
+          you. The address bar keeps up on its own as you play, so you can also
+          just copy it. Opening a link with a position in it starts a fresh
+          game from there.
+        </li>
+        <li>
           Made a mistake? In Set&nbsp;up mode, <strong>Undo</strong> /{" "}
           <strong>Redo</strong> (or <strong>Ctrl+Z</strong> /{" "}
           <strong>Ctrl+Shift+Z</strong>) step back and forth through your edits.
