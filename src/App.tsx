@@ -20,6 +20,7 @@ import { MoveLog } from "./components/MoveLog";
 import { About } from "./components/About";
 import { useStockfish } from "./engine/useStockfish";
 import { STARTING_FEN } from "./engine/fen";
+import { fenFromSearch, searchForFen } from "./engine/positionLink";
 import { config } from "./config/config";
 import type { Fen, MoveLogEntry } from "./config/types";
 import "./App.css";
@@ -43,10 +44,16 @@ interface GameState {
 }
 
 export default function App() {
-  const [game, setGame] = useState<GameState>({
-    entries: [{ fen: STARTING_FEN }],
+  // A ?fen= link opens straight to that position. Read once, in a lazy
+  // initializer, so a later re-render can't reset the board to whatever the URL
+  // said at mount. fenFromSearch validates and normalizes, returning null for
+  // anything it won't vouch for - a hand-edited or truncated link lands you on
+  // the starting position rather than an error, which is the friendlier failure
+  // for something arriving from a chat window.
+  const [game, setGame] = useState<GameState>(() => ({
+    entries: [{ fen: fenFromSearch(window.location.search) ?? STARTING_FEN }],
     index: 0,
-  });
+  }));
   const fen = game.entries[game.index].fen;
   // Two ways a suggested move becomes an arrow on the board: hovering a move
   // row previews one transiently, and clicking a row pins one so it stays after
@@ -117,6 +124,17 @@ export default function App() {
   function togglePin(uci: string) {
     setPinnedUci((prev) => (prev === uci ? null : uci));
   }
+
+  // Keep the address bar on the position that's actually showing, so the URL is
+  // always the one worth sharing and a reload returns to the same board.
+  //
+  // replaceState, NOT pushState: pushing would make the browser's back button
+  // step through positions, which collides head-on with the ← / → move
+  // navigation and the move log's own back/forward buttons - two competing
+  // histories over the same board. Replacing keeps exactly one.
+  useEffect(() => {
+    window.history.replaceState(null, "", searchForFen(fen));
+  }, [fen]);
 
   // A pin belongs to the position it was set on. Drop it whenever the board
   // changes underneath it - a played move, paste, setup edit, or a back/forward
