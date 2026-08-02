@@ -118,6 +118,43 @@ a.action-btn {
   max-width: 420px;
 }
 
+/* Captured pieces + material lead, one row on each edge of the board. Matched
+   to .board-wrap's max-width so the rows line up with the board rather than
+   with the wider controls below it.
+
+   min-height is load-bearing: the rows are rendered from the first move of a
+   game, when neither side has captured anything and both are empty. Without a
+   reserved height the board would sit higher until the first capture and then
+   jump down - the same layout-stability problem the Best moves panel solves
+   with its blank rows. */
+.material-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  max-width: 420px;
+  min-height: 26px;
+  padding: 0 2px;
+  font-size: 13px;
+}
+
+/* The glyphs overlap slightly so a long row of captured pawns stays compact
+   rather than pushing the lead off the end of the line. */
+.material-captured {
+  display: flex;
+  align-items: center;
+  line-height: 1;
+  color: var(--ink);
+  font-size: 19px;
+}
+.material-piece + .material-piece { margin-left: -4px; }
+
+.material-lead {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Promotion picker. react-chessboard 4 drew its own dialog over the board and
    handed back the chosen piece; version 5 dropped that entirely, so this is the
    app's replacement. Fixed rather than absolute so it needs no positioned
@@ -200,6 +237,7 @@ a.action-btn {
 .side-toggle,
 .castling-toggle,
 .pressure-toggle,
+.material-toggle,
 .setup-undo {
   display: flex;
   align-items: center;
@@ -210,11 +248,13 @@ a.action-btn {
 .side-toggle span,
 .castling-toggle span,
 .pressure-toggle span,
+.material-toggle span,
 .setup-undo span { color: var(--muted); margin-right: 4px; }
 .mode-toggle button,
 .side-toggle button,
 .castling-toggle button,
-.pressure-toggle button {
+.pressure-toggle button,
+.material-toggle button {
   border: 1px solid var(--line);
   background: #fff;
   padding: 4px 14px;
@@ -228,7 +268,8 @@ a.action-btn {
   border-color: var(--prawn);
 }
 .side-toggle button.active,
-.castling-toggle button.active {
+.castling-toggle button.active,
+.material-toggle button.active {
   background: var(--board-green);
   color: #fff;
   border-color: var(--board-green);

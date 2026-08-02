@@ -103,6 +103,16 @@ export function About({ onClose, backHref }: AboutProps) {
           The <strong>last move</strong> played is highlighted on the squares it
           came from and went to.
         </li>
+        <li>
+          The <strong>material</strong> rows above and below the board show what
+          each side has captured, and how far ahead the leader is in pawns.
+          They're read from the position itself, so they fill in the moment the
+          board changes rather than waiting for the engine - and they work in
+          Set&nbsp;up mode too. Working out which pieces were <em>captured</em>{" "}
+          means assuming the position came from a standard game; where that
+          doesn't hold, switch the rows off with the <strong>Material</strong>{" "}
+          toggle.
+        </li>
       </ul>
 
       <h2>How your moves are judged</h2>

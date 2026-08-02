@@ -22,6 +22,8 @@ import { Chess } from "chess.js";
 import type { Square } from "chess.js";
 import { recognizeBoard, NotImplementedError } from "../recognition/recognizeBoard";
 import { shareUrl } from "../engine/positionLink";
+import { readMaterial } from "../engine/material";
+import { MaterialBar } from "./MaterialBar";
 import { config } from "../config/config";
 import {
   STARTING_FEN,
@@ -171,6 +173,7 @@ export function BoardInput({
   const [hoveredSquare, setHoveredSquare] = useState<Square | null>(null);
   const [pinnedSquare, setPinnedSquare] = useState<Square | null>(null);
   const [showPressure, setShowPressure] = useState(true);
+  const [showMaterial, setShowMaterial] = useState(true);
 
   // Undo/redo history for Set up mode only. Play mode already has one - the move
   // log - but a Set up edit deliberately resets that (it's a new position, not a
@@ -183,6 +186,14 @@ export function BoardInput({
 
   const sideToMove = getSideToMove(fen);
   const castling = getCastlingRights(fen);
+
+  // Read off the position alone - no engine, so this is right the moment the
+  // board changes, including in setup mode and while a search is still running.
+  const material = useMemo(() => readMaterial(fen), [fen]);
+  // Each row belongs to the side sitting on that edge of the board, so the pair
+  // follows the orientation rather than colour: flipping the board swaps them.
+  const topSide = orientation === "white" ? "b" : "w";
+  const bottomSide = orientation === "white" ? "w" : "b";
 
   // A promotion the user has started but not yet resolved. react-chessboard 4
   // owned this interaction - it withheld onPieceDrop until its own Q/R/B/N
@@ -672,6 +683,7 @@ export function BoardInput({
 
   return (
     <div className="board-input">
+      {showMaterial && <MaterialBar material={material} side={topSide} />}
       <div className="board-wrap">
         <Chessboard
           options={{
@@ -713,6 +725,7 @@ export function BoardInput({
           }}
         />
       </div>
+      {showMaterial && <MaterialBar material={material} side={bottomSide} />}
 
       {/* Replaces the picker react-chessboard 4 drew itself. Rendered outside
           .board-wrap so it is never clipped by the board's own bounds. */}
@@ -817,6 +830,23 @@ export function BoardInput({
             }
           >
             {showPressure ? "On" : "Off"}
+          </button>
+        </div>
+
+        {/* Deliberately NOT disabled in setup mode, unlike Pressure. Material
+            is read from the placement alone, so it stays meaningful on a freely
+            built position - and the captured rows are exactly where a position
+            that never came from a standard game reads oddly, which is the case
+            this toggle exists to switch off. */}
+        <div className="material-toggle">
+          <span>Material</span>
+          <button
+            className={showMaterial ? "active" : ""}
+            onClick={() => setShowMaterial((on) => !on)}
+            aria-pressed={showMaterial}
+            title="Show each side's captured pieces and material lead above and below the board. Captures assume the position came from a standard game - switch this off where that doesn't hold."
+          >
+            {showMaterial ? "On" : "Off"}
           </button>
         </div>
 
