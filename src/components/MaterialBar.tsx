@@ -46,9 +46,15 @@ interface MaterialBarProps {
   material: Material;
   // Whose row this is - the side sitting on this edge of the board.
   side: "w" | "b";
+  // Switched off by the Material toggle. The row still renders and still takes
+  // up its space - it is only made invisible - because unmounting it moves the
+  // board up the page, so flipping the toggle would shift the board under the
+  // pointer. Reserving the space is the same reasoning that gives the row a
+  // min-height for the empty case; the toggle is just another way to reach it.
+  hidden?: boolean;
 }
 
-export function MaterialBar({ material, side }: MaterialBarProps) {
+export function MaterialBar({ material, side, hidden = false }: MaterialBarProps) {
   const mine = side === "w" ? material.white : material.black;
   // A side's captured pieces are the opponent's, so they are drawn in the
   // opponent's colour: the White row shows the black pieces White has taken.
@@ -68,10 +74,20 @@ export function MaterialBar({ material, side }: MaterialBarProps) {
     .join(", ");
 
   return (
-    // Always rendered, even with nothing to show. The row reserves its height
-    // in CSS so that the first capture of a game doesn't shove the board down
-    // the page - the same reasoning the Best moves panel's blank rows use.
-    <div className="material-bar" aria-label={label} title={label}>
+    // Always rendered, even with nothing to show and even when switched off.
+    // The row reserves its height in CSS so that neither the first capture of a
+    // game nor the Material toggle shoves the board up or down the page - the
+    // same reasoning the Best moves panel's blank rows use.
+    //
+    // Switched off it is made invisible rather than emptied, so the space it
+    // holds cannot depend on what happens to be in it. visibility:hidden also
+    // takes it out of the accessibility tree, which is why the label below is
+    // dropped in that state - a row nobody can see should not be described.
+    <div
+      className={hidden ? "material-bar material-bar-hidden" : "material-bar"}
+      aria-label={hidden ? undefined : label}
+      title={hidden ? undefined : label}
+    >
       {/* aria-hidden because the glyphs would otherwise be announced one by one
           as "white chess queen, white chess queen, ..."; the row's aria-label
           says the same thing in words. */}

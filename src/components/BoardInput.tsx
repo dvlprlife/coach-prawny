@@ -683,7 +683,7 @@ export function BoardInput({
 
   return (
     <div className="board-input">
-      {showMaterial && <MaterialBar material={material} side={topSide} />}
+      <MaterialBar material={material} side={topSide} hidden={!showMaterial} />
       <div className="board-wrap">
         <Chessboard
           options={{
@@ -725,7 +725,7 @@ export function BoardInput({
           }}
         />
       </div>
-      {showMaterial && <MaterialBar material={material} side={bottomSide} />}
+      <MaterialBar material={material} side={bottomSide} hidden={!showMaterial} />
 
       {/* Replaces the picker react-chessboard 4 drew itself. Rendered outside
           .board-wrap so it is never clipped by the board's own bounds. */}

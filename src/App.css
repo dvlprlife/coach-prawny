@@ -126,7 +126,11 @@ a.action-btn {
    game, when neither side has captured anything and both are empty. Without a
    reserved height the board would sit higher until the first capture and then
    jump down - the same layout-stability problem the Best moves panel solves
-   with its blank rows. */
+   with its blank rows.
+
+   The Material toggle reaches that same problem by a different route, which is
+   why switching it off hides the rows rather than removing them: an unmounted
+   row takes its 26px with it and the board slides up under the pointer. */
 .material-bar {
   display: flex;
   align-items: center;
@@ -137,6 +141,11 @@ a.action-btn {
   padding: 0 2px;
   font-size: 13px;
 }
+
+/* Switched off: still laid out, just not drawn. Not display:none, and not an
+   empty row either - the height has to hold regardless of what the row would
+   have contained. */
+.material-bar-hidden { visibility: hidden; }
 
 /* The glyphs overlap slightly so a long row of captured pawns stays compact
    rather than pushing the lead off the end of the line. */
