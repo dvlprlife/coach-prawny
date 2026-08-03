@@ -64,7 +64,27 @@ export default function App() {
   const [hoveredUci, setHoveredUci] = useState<string | null>(null);
   const [pinnedUci, setPinnedUci] = useState<string | null>(null);
   const [moveCount, setMoveCount] = useState(config.engine.multiPv);
+  // What the ENGINE is asked for, which is deliberately not always what is on
+  // screen. "Show 0" hides the list but leaves this on the last real count, so
+  // hiding is a display change and nothing else.
+  //
+  // The tempting version - clamp MultiPV to `max(moveCount, 1)` - is wrong, and
+  // not only because MultiPV 0 is not a legal Stockfish option. Stockfish
+  // genuinely searches differently per MultiPV: from the opening position it
+  // calls d4 best at MultiPV 3 and e4 best at MultiPV 1. The rank-1 move is
+  // what the move log grades against, so hiding the suggestions would silently
+  // re-grade the game underneath you - stripping the star off a move that was
+  // best when you played it. Hiding the answers must not change the marking.
+  const [engineMultiPv, setEngineMultiPv] = useState(config.engine.multiPv);
   const [showAbout, setShowAbout] = useState(false);
+
+  // 0 is a display state, so it never reaches the engine. Leaving engineMultiPv
+  // alone also means toggling the list off and back on costs no search at all:
+  // the effect below doesn't re-run, and the existing result is still there.
+  function handleMoveCountChange(count: number) {
+    setMoveCount(count);
+    if (count > 0) setEngineMultiPv(count);
+  }
 
   // A played move (from BoardInput's play mode) extends the log; any other
   // FEN change (paste, setup edit, toggles, reset) starts a fresh one - it's
@@ -145,6 +165,18 @@ export default function App() {
     setPinnedUci(null);
   }, [fen]);
 
+  // Hiding the list has to drop the arrows with it. A pin is unpinned by
+  // clicking its row, so a pinned arrow outliving the rows would be stuck on
+  // the board with nothing left to click - and a hover can outlive them too,
+  // since React fires no mouseleave for a row that unmounts under the cursor.
+  // Both would also defeat the point of hiding the moves: the answer would
+  // still be drawn across the board.
+  useEffect(() => {
+    if (moveCount > 0) return;
+    setPinnedUci(null);
+    setHoveredUci(null);
+  }, [moveCount]);
+
   function goBack() {
     setGame((g) => ({ ...g, index: Math.max(0, g.index - 1) }));
   }
@@ -195,11 +227,12 @@ export default function App() {
       ? { from: currentEntry.from as Square, to: currentEntry.to as Square }
       : undefined;
 
-  // Re-analyze whenever the position or requested move count changes
-  // (debounced inside the hook).
+  // Re-analyze whenever the position or the engine's move count changes
+  // (debounced inside the hook). Keyed on engineMultiPv, NOT moveCount, so
+  // hiding the list neither re-searches nor re-grades - see the note above.
   useEffect(() => {
-    analyze(fen, moveCount);
-  }, [fen, moveCount, analyze]);
+    analyze(fen, engineMultiPv);
+  }, [fen, engineMultiPv, analyze]);
 
   // Record each position's evaluation onto its own move-log entry as the
   // analysis lands. That's what lets MoveLog judge a move: comparing the score
@@ -292,7 +325,7 @@ export default function App() {
               onTogglePin={togglePin}
               pinnedUci={pinnedUci}
               moveCount={moveCount}
-              onMoveCountChange={setMoveCount}
+              onMoveCountChange={handleMoveCountChange}
             />
             <MoveLog
               entries={game.entries}
