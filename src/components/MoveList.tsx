@@ -10,7 +10,18 @@
 
 import type { AnalysisResult, EngineMove } from "../config/types";
 
-const MOVE_COUNT_OPTIONS = [1, 2, 3, 4, 5];
+// 0 hides the suggestions without unmounting the panel - see reservedRows. It
+// hides the LIST only: the engine carries on at whatever count was last chosen
+// (App keeps that separately), so the move log keeps grading moves while the
+// answers are covered up. That's the point of it - you can work the position
+// out yourself and still have the log tell you how you did.
+const MOVE_COUNT_OPTIONS = [0, 1, 2, 3, 4, 5];
+
+// The panel never shrinks below three rows. Reserving the space for the count
+// you are most likely to come back to keeps the move log below from sliding up
+// the moment you hide the moves and back down when you show them again -
+// choosing 0 should cover the answers, not rearrange the page around them.
+const MIN_RESERVED_ROWS = 3;
 
 interface MoveListProps {
   result: AnalysisResult | null;
@@ -85,6 +96,15 @@ export function MoveList({
   moveCount,
   onMoveCountChange,
 }: MoveListProps) {
+  // How many row slots the panel holds open, whatever is actually in them.
+  const reservedRows = Math.max(moveCount, MIN_RESERVED_ROWS);
+  // The engine keeps searching at the last chosen count even at "Show 0" (see
+  // App), so what came back routinely outruns what should be shown. Slice
+  // rather than trusting the result's length: at 0 this is what empties the
+  // list, and it also covers the moment after lowering Show, before the
+  // narrower result lands.
+  const visibleMoves = result ? result.moves.slice(0, moveCount) : [];
+
   return (
     <div className="move-list">
       <div className="move-list-header">
@@ -116,9 +136,13 @@ export function MoveList({
         <p className="status">No legal moves - checkmate or stalemate.</p>
       )}
 
+      {/* Guarded on the RESULT's moves, not the visible ones: at "Show 0"
+          there are no visible rows, but this is still a position with legal
+          moves and should render the (blank) list rather than fall through to
+          the checkmate message below. */}
       {result && result.moves.length > 0 && (
         <ol className="moves">
-          {result.moves.map((m) => {
+          {visibleMoves.map((m) => {
             const pinned = pinnedUci === m.move;
             const label = m.san ?? m.move;
             return (
@@ -177,14 +201,16 @@ export function MoveList({
             </li>
             );
           })}
-          {/* Pad out to the requested count. A position with fewer legal moves
-              than "Show N" (a king with three squares, say) would otherwise
-              render a shorter panel than both the placeholders that preceded it
-              and the position before it, so the move log below would settle
-              upwards on arrival and drop back on the next move. Hidden rather
+          {/* Pad out to the reserved height. Two things land here. A position
+              with fewer legal moves than "Show N" (a king with three squares,
+              say) would otherwise render a shorter panel than both the
+              placeholders that preceded it and the position before it, so the
+              move log below would settle upwards on arrival and drop back on
+              the next move. And at "Show 0" every row is padding - that is what
+              covers the answers without collapsing the panel. Hidden rather
               than omitted: same height, nothing drawn. */}
           {Array.from(
-            { length: Math.max(0, moveCount - result.moves.length) },
+            { length: Math.max(0, reservedRows - visibleMoves.length) },
             (_, i) => (
               <BlankRow key={`pad-${i}`} className="move pad" />
             )
@@ -202,9 +228,17 @@ export function MoveList({
           multiPv-only change - that keeps its result and refines in place. */}
       {analyzing && !result && !error && (
         <ol className="moves skeleton" aria-hidden="true">
-          {Array.from({ length: moveCount }, (_, i) => (
-            <BlankRow key={i} className="move" rank={i + 1} />
-          ))}
+          {Array.from({ length: reservedRows }, (_, i) =>
+            i < moveCount ? (
+              <BlankRow key={i} className="move" rank={i + 1} />
+            ) : (
+              // Past the requested count, reuse the real list's hidden filler
+              // rather than a loading bar. A grey bar is a promise that a row
+              // is coming, and beyond "Show N" none is - at "Show 0" that would
+              // mean three bars shimmering their way to nothing.
+              <BlankRow key={i} className="move pad" />
+            )
+          )}
         </ol>
       )}
 

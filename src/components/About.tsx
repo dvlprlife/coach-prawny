@@ -65,7 +65,9 @@ export function About({ onClose, backHref }: AboutProps) {
         Scores are from <strong>White's</strong> perspective - positive means
         White stands better, negative means Black - and a forced mate reads as{" "}
         <strong>+M5</strong> / <strong>-M5</strong>. Use <strong>Show</strong>{" "}
-        to choose how many moves (1-5) to list.
+        to choose how many moves (1-5) to list, or <strong>Show 0</strong> to
+        hide them: the engine keeps analysing, so you can work the position out
+        yourself and still have the move log grade what you played.
       </p>
       <ul>
         <li>
