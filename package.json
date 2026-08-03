@@ -9,6 +9,7 @@
     "prebuild": "npm run sync-engine",
     "build": "tsc && vite build && npm run build-about",
     "build-about": "node scripts/build-about.mjs",
+    "lint": "oxlint",
     "test": "vitest run",
     "preview": "vite preview",
     "sync-engine": "node scripts/sync-engine.mjs"
@@ -24,6 +25,7 @@
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.5",
+    "oxlint": "^1.77.0",
     "typescript": "^7.0.2",
     "vite": "^8.2.0",
     "vitest": "^4.1.10"
