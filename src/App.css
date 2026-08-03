@@ -236,11 +236,24 @@ a.action-btn {
 
 .promotion-cancel:hover { color: var(--prawn); }
 
+/* A column of explicit rows rather than one wrapping line. Which controls
+   shared a line used to be incidental - it fell out of their widths against the
+   column - so adding a control, renaming one, or a font change could silently
+   regroup the whole panel. The rows are now stated in the markup instead, which
+   is what keeps Pressure and Material together directly under Board mode. */
 .board-controls {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 20px;
   margin: 16px 0 12px;
+}
+/* Controls within a row still wrap if the column gets narrow - the grouping is
+   deliberate, the single line isn't a promise at every width. */
+.control-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
 }
 .mode-toggle,
 .side-toggle,

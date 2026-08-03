@@ -766,116 +766,136 @@ export function BoardInput({
         </div>
       )}
 
+      {/* Grouped into explicit rows. Which controls shared a line was previously
+          whatever their widths happened to produce, so the panel regrouped
+          itself whenever one was added or renamed. Each .control-row is one
+          line of related controls; they still wrap within a row if the column
+          gets narrow. */}
       <div className="board-controls">
-        <div className="mode-toggle">
-          <span>Board mode</span>
-          <button
-            className={mode === "play" ? "active" : ""}
-            onClick={() => setMode("play")}
-            title="Only legal moves; auto-updates whose turn it is"
-          >
-            Play
-          </button>
-          <button
-            className={mode === "setup" ? "active" : ""}
-            onClick={() => setMode("setup")}
-            title="Freely place pieces to build any position"
-          >
-            Set up
-          </button>
-        </div>
-
-        {/* Undo/redo for free-placement edits, shown only in Set up mode - Play
-            mode already has this in the move log. Ctrl+Z / Ctrl+Shift+Z do the
-            same (see the keydown effect). The history resets on entering Set up. */}
-        {mode === "setup" && (
-          <div className="setup-undo">
-            <span>Edit history</span>
+        {/* How the board behaves, plus the edit history that only Set up mode
+            has - it belongs beside the mode that produces it. */}
+        <div className="control-row">
+          <div className="mode-toggle">
+            <span>Board mode</span>
             <button
-              type="button"
-              className="action-btn"
-              onClick={undoSetup}
-              disabled={!canUndoSetup}
-              title="Undo the last setup edit (Ctrl+Z)"
+              className={mode === "play" ? "active" : ""}
+              onClick={() => setMode("play")}
+              title="Only legal moves; auto-updates whose turn it is"
             >
-              ↶ Undo
+              Play
             </button>
             <button
-              type="button"
-              className="action-btn"
-              onClick={redoSetup}
-              disabled={!canRedoSetup}
-              title="Redo the last undone edit (Ctrl+Shift+Z)"
+              className={mode === "setup" ? "active" : ""}
+              onClick={() => setMode("setup")}
+              title="Freely place pieces to build any position"
             >
-              ↷ Redo
+              Set up
             </button>
           </div>
-        )}
 
-        {/* Disabled in setup mode rather than merely inert: hover arrows are a
-            play-mode feature (setup mode has no rules to derive them from), so
-            an enabled-looking button would just appear to do nothing - the same
-            reasoning the castling buttons use. */}
-        <div className="pressure-toggle">
-          <span>Pressure</span>
-          <button
-            className={showPressure ? "active" : ""}
-            onClick={() => setShowPressure((on) => !on)}
-            disabled={mode !== "play"}
-            aria-pressed={showPressure}
-            title={
-              mode === "play"
-                ? "On hover, arrow in every piece bearing down on that square: red for those that could capture there, green for those that would recapture"
-                : "Pressure arrows need Play mode - Set up mode has no rules to derive them from"
-            }
-          >
-            {showPressure ? "On" : "Off"}
-          </button>
+          {/* Undo/redo for free-placement edits, shown only in Set up mode -
+              Play mode already has this in the move log. Ctrl+Z / Ctrl+Shift+Z
+              do the same (see the keydown effect). The history resets on
+              entering Set up. */}
+          {mode === "setup" && (
+            <div className="setup-undo">
+              <span>Edit history</span>
+              <button
+                type="button"
+                className="action-btn"
+                onClick={undoSetup}
+                disabled={!canUndoSetup}
+                title="Undo the last setup edit (Ctrl+Z)"
+              >
+                ↶ Undo
+              </button>
+              <button
+                type="button"
+                className="action-btn"
+                onClick={redoSetup}
+                disabled={!canRedoSetup}
+                title="Redo the last undone edit (Ctrl+Shift+Z)"
+              >
+                ↷ Redo
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Deliberately NOT disabled in setup mode, unlike Pressure. Material
-            is read from the placement alone, so it stays meaningful on a freely
-            built position - and the captured rows are exactly where a position
-            that never came from a standard game reads oddly, which is the case
-            this toggle exists to switch off. */}
-        <div className="material-toggle">
-          <span>Material</span>
-          <button
-            className={showMaterial ? "active" : ""}
-            onClick={() => setShowMaterial((on) => !on)}
-            aria-pressed={showMaterial}
-            title="Show each side's captured pieces and material lead above and below the board. Captures assume the position came from a standard game - switch this off where that doesn't hold."
-          >
-            {showMaterial ? "On" : "Off"}
-          </button>
+        {/* What the board draws for you. Both are view options that change
+            nothing about the position itself, which is why they share a line -
+            and why that line sits above the controls that DO edit the position. */}
+        <div className="control-row">
+          {/* Disabled in setup mode rather than merely inert: hover arrows are a
+              play-mode feature (setup mode has no rules to derive them from), so
+              an enabled-looking button would just appear to do nothing - the
+              same reasoning the castling buttons use. */}
+          <div className="pressure-toggle">
+            <span>Pressure</span>
+            <button
+              className={showPressure ? "active" : ""}
+              onClick={() => setShowPressure((on) => !on)}
+              disabled={mode !== "play"}
+              aria-pressed={showPressure}
+              title={
+                mode === "play"
+                  ? "On hover, arrow in every piece bearing down on that square: red for those that could capture there, green for those that would recapture"
+                  : "Pressure arrows need Play mode - Set up mode has no rules to derive them from"
+              }
+            >
+              {showPressure ? "On" : "Off"}
+            </button>
+          </div>
+
+          {/* Deliberately NOT disabled in setup mode, unlike Pressure. Material
+              is read from the placement alone, so it stays meaningful on a
+              freely built position - and the captured rows are exactly where a
+              position that never came from a standard game reads oddly, which is
+              the case this toggle exists to switch off. */}
+          <div className="material-toggle">
+            <span>Material</span>
+            <button
+              className={showMaterial ? "active" : ""}
+              onClick={() => setShowMaterial((on) => !on)}
+              aria-pressed={showMaterial}
+              title="Show each side's captured pieces and material lead above and below the board. Captures assume the position came from a standard game - switch this off where that doesn't hold."
+            >
+              {showMaterial ? "On" : "Off"}
+            </button>
+          </div>
         </div>
 
-        <div className="side-toggle">
-          <span>Side to move</span>
-          <button
-            className={sideToMove === "w" ? "active" : ""}
-            onClick={() => commitFen(setSideToMove(fen, "w"))}
-          >
-            White
-          </button>
-          <button
-            className={sideToMove === "b" ? "active" : ""}
-            onClick={() => commitFen(setSideToMove(fen, "b"))}
-          >
-            Black
-          </button>
+        {/* The parts of the position that aren't piece placement. */}
+        <div className="control-row">
+          <div className="side-toggle">
+            <span>Side to move</span>
+            <button
+              className={sideToMove === "w" ? "active" : ""}
+              onClick={() => commitFen(setSideToMove(fen, "w"))}
+            >
+              White
+            </button>
+            <button
+              className={sideToMove === "b" ? "active" : ""}
+              onClick={() => commitFen(setSideToMove(fen, "b"))}
+            >
+              Black
+            </button>
+          </div>
         </div>
 
-        <div className="castling-toggle">
-          <span>White castling</span>
-          {castlingButton("K", "O-O", "White kingside (O-O)")}
-          {castlingButton("Q", "O-O-O", "White queenside (O-O-O)")}
-        </div>
+        <div className="control-row">
+          <div className="castling-toggle">
+            <span>White castling</span>
+            {castlingButton("K", "O-O", "White kingside (O-O)")}
+            {castlingButton("Q", "O-O-O", "White queenside (O-O-O)")}
+          </div>
 
-        <div className="castling-toggle">
-          <span>Black castling</span>
-          {castlingButton("k", "O-O", "Black kingside (O-O)")}
-          {castlingButton("q", "O-O-O", "Black queenside (O-O-O)")}
+          <div className="castling-toggle">
+            <span>Black castling</span>
+            {castlingButton("k", "O-O", "Black kingside (O-O)")}
+            {castlingButton("q", "O-O-O", "Black queenside (O-O-O)")}
+          </div>
         </div>
 
         <div className="board-actions">
