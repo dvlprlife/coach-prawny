@@ -39,10 +39,25 @@ jobs:
           node-version: '24.x'
           cache: 'npm'
       - run: npm ci
-      # Unit tests over the pure FEN helpers (src/engine/fen.test.ts). Runs
-      # before the build so a logic regression fails fast rather than after a
-      # full bundle. There is still no lint config — when one lands, add it as
-      # its own step alongside this one.
+      # oxlint rather than ESLint: typescript-eslint hard-refuses to load
+      # against TypeScript 7 (it throws on startup, so --force does not help),
+      # and this repo is on TS 7. oxlint brings its own parser and has no
+      # opinion about the TypeScript version. The rules that actually earn
+      # their keep here are react-hooks/exhaustive-deps and rules-of-hooks —
+      # the React layer has no test coverage at all, so this is the only
+      # automated check that looks at it. Revisit ESLint if/when
+      # typescript-eslint supports TS >=7.1 (their issue #10940).
+      #
+      # This is a step inside the existing matrix job, not a job of its own, so
+      # the ruleset's required status checks stay as they are — they are
+      # matrix-derived strings ("build (ubuntu-latest)"), and a new job would
+      # not be required-by-default. It runs first because it takes
+      # milliseconds; a lint failure should not wait on a full bundle.
+      - name: Lint (oxlint)
+        run: npm run lint
+      # Unit tests over the pure modules (fen, material, moveQuality,
+      # positionLink). Runs before the build so a logic regression fails fast
+      # rather than after a full bundle.
       - name: Test (vitest)
         run: npm test
       # `npm run build` is `tsc && vite build`, so this is the typecheck gate

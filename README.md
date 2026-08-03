@@ -35,6 +35,13 @@ npm install
 npm run dev
 ```
 
+```bash
+npm run lint   # oxlint - react-hooks rules over src/ and scripts/
+npm test       # vitest - the pure engine modules
+npm run build  # tsc + vite build + the standalone About page
+```
+Lint, test and build all run in CI on every PR.
+
 ## Architecture
 Two swappable seams - `recognition` (image → FEN) and `engine` (FEN → moves) -
 keep either stage movable to a backend later via a config flag in

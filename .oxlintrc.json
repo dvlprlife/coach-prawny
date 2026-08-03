@@ -1,0 +1,41 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+
+  // oxlint, not ESLint, because typescript-eslint throws on startup against
+  // TypeScript 7 and this repo is on TS 7. See the comment in
+  // .github/workflows/build.yml for the full reasoning.
+
+  // CAREFUL: setting `plugins` REPLACES the base set rather than adding to it,
+  // so the defaults (eslint, typescript, unicorn, oxc) have to be relisted or
+  // they silently switch off. `react` is the one that is off by default and is
+  // the whole reason this file exists — it carries the react-hooks rules.
+  // `vitest` catches a stray `.only` left in a test file.
+  "plugins": ["eslint", "typescript", "unicorn", "oxc", "react", "vitest"],
+
+  // `correctness` is oxlint's own default category and is the only one enabled
+  // deliberately: it is the "outright wrong" tier. The wider categories
+  // (pedantic, style, restriction) are noisy enough on this codebase that they
+  // would train people to ignore lint output.
+  "categories": {
+    "correctness": "error"
+  },
+
+  "env": {
+    "browser": true,
+    "es2024": true
+  },
+
+  // The two rules this whole setup is for. The React layer has no test
+  // coverage at all, so these are the only automated check that reads it — a
+  // stale dependency array is exactly the class of bug that ships past a green
+  // CI here. Promoted to `error` explicitly so they gate CI rather than
+  // scrolling past as warnings.
+  "rules": {
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "error"
+  },
+
+  // dist/ is build output; public/engine/ is gitignored Stockfish WASM glue
+  // copied out of node_modules by scripts/sync-engine.mjs, and is not ours.
+  "ignorePatterns": ["dist/**", "public/engine/**"]
+}
