@@ -3,7 +3,7 @@
 // changes the position shown everywhere (board + engine), same as if the
 // user had pasted that FEN directly.
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { getSideToMove, STARTING_FEN } from "../engine/fen";
 import {
   assessEntry,
@@ -109,9 +109,49 @@ function buildPgn(entries: MoveLogEntry[]): string {
   return `[FEN "${startFen}"]\n[SetUp "1"]\n\n${movetext}`;
 }
 
+// Keeps the highlighted move visible while stepping. The list only shows 10
+// rows, so past that point the current move walks off the edge and the user
+// has to chase it with the scrollbar. Deliberately nudges only the list's own
+// scrollTop rather than calling scrollIntoView, which would also scroll the
+// page to bring the panel into view - jarring when you're just holding the
+// arrow key. Rects rather than offsetTop so it doesn't depend on the list
+// being a positioned ancestor.
+function useScrollCurrentIntoView(
+  listRef: React.RefObject<HTMLOListElement | null>,
+  rowRef: React.RefObject<HTMLLIElement | null>,
+  currentIndex: number,
+  rowCount: number,
+) {
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    // Index 0 is the starting position, which no row represents - stepping all
+    // the way back should show the top of the game rather than stay put.
+    if (currentIndex === 0) {
+      list.scrollTop = 0;
+      return;
+    }
+    const row = rowRef.current;
+    if (!row) return;
+    const listBox = list.getBoundingClientRect();
+    const rowBox = row.getBoundingClientRect();
+    if (rowBox.top < listBox.top) {
+      list.scrollTop += rowBox.top - listBox.top;
+    } else if (rowBox.bottom > listBox.bottom) {
+      list.scrollTop += rowBox.bottom - listBox.bottom;
+    }
+    // rowCount is a dependency because loading a different game can leave the
+    // index unchanged while the row under it becomes a completely new move.
+  }, [listRef, rowRef, currentIndex, rowCount]);
+}
+
 export function MoveLog({ entries, currentIndex, onBack, onForward }: MoveLogProps) {
   const rows = buildRows(entries);
   const [copied, setCopied] = useState(false);
+  const listRef = useRef<HTMLOListElement | null>(null);
+  const currentRowRef = useRef<HTMLLIElement | null>(null);
+
+  useScrollCurrentIntoView(listRef, currentRowRef, currentIndex, rows.length);
 
   async function copyPgn() {
     try {
@@ -163,9 +203,17 @@ export function MoveLog({ entries, currentIndex, onBack, onForward }: MoveLogPro
       {rows.length === 0 ? (
         <p className="status">No moves yet.</p>
       ) : (
-        <ol className="move-log-list">
+        <ol className="move-log-list" ref={listRef}>
           {rows.map((row) => (
-            <li className="move-log-row" key={row.number}>
+            <li
+              className="move-log-row"
+              key={row.number}
+              ref={
+                row.white?.index === currentIndex || row.black?.index === currentIndex
+                  ? currentRowRef
+                  : null
+              }
+            >
               <span className="num">{row.number}.</span>
               <span className={row.white?.index === currentIndex ? "san current" : "san"}>
                 {row.white?.san ?? ""}
