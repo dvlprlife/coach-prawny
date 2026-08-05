@@ -41,6 +41,16 @@ export function About({ onClose, backHref }: AboutProps) {
           with defaults. The copy button copies the current position back out.
         </li>
         <li>
+          <strong>Paste a PGN</strong> - anywhere on the page, no need to click
+          into anything first - to load a whole game. The move log fills with
+          the full game and the board lands on the final position, so you can
+          step back through it with <strong>‹ ›</strong> or the{" "}
+          <strong>← →</strong> keys. Comments, annotations and alternative
+          variations are ignored, and a game that didn't begin from the starting
+          position loads from wherever it did. Pasting a FEN is unaffected - it
+          still goes in the box below.
+        </li>
+        <li>
           Set whose turn it is with <strong>Side to move</strong>, and toggle{" "}
           <strong>castling</strong> rights for each side. A castling button is
           disabled when that king and rook aren't both on their home squares.
@@ -139,6 +149,12 @@ export function About({ onClose, backHref }: AboutProps) {
           annotations fill in.
         </li>
         <li>
+          The same goes for a game you've just <strong>pasted in</strong>: none
+          of its positions have been looked at yet, so it arrives with no
+          annotations at all. Walking back through the moves scores them one by
+          one, and the marks appear behind you as you go.
+        </li>
+        <li>
           Once a game is completely won or lost, further imprecision is not
           flagged - but giving up a forced mate always is.
         </li>
@@ -153,7 +169,8 @@ export function About({ onClose, backHref }: AboutProps) {
         <li>
           Step through the move history with the <strong>‹ ›</strong> buttons or
           the <strong>← →</strong> arrow keys, and <strong>Copy PGN</strong> to
-          export the game.
+          export the game - which you can paste straight back in to pick it up
+          again later.
         </li>
       </ul>
 

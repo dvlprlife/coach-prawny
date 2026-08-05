@@ -108,6 +108,24 @@ export default function App() {
     });
   }
 
+  // A whole game arriving at once (a pasted PGN). Unlike handleFenChange this
+  // replaces the entire timeline rather than starting a one-entry log, which is
+  // the point: the history IS what a PGN carries, and it's what makes the move
+  // log's annotations reachable for a game played somewhere else.
+  //
+  // Lands on the FINAL position, the way opening a game on any chess site does -
+  // the result is what you came to look at, and ← steps back from there.
+  //
+  // Every entry arrives unscored: MoveLogEntry's eval fields are filled in by the
+  // analysis effect below, one position at a time, as each is actually shown. So
+  // a freshly loaded game is unannotated until you step back through it, and the
+  // annotations appear as you go. Sweeping the whole game up front would mean
+  // running the engine over 40 positions before showing anything.
+  function loadGame(entries: MoveLogEntry[]) {
+    if (entries.length === 0) return;
+    setGame({ entries, index: entries.length - 1 });
+  }
+
   // Clicking a suggested move plays it, exactly as though it had been dragged:
   // chess.js validates it against the current position and gives the resulting
   // FEN, and passing `move` extends the move log rather than starting a fresh
@@ -311,6 +329,7 @@ export default function App() {
             <BoardInput
               fen={fen}
               onFenChange={handleFenChange}
+              onGameLoad={loadGame}
               arrows={arrows}
               lastMove={lastMove}
             />

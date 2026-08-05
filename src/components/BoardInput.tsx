@@ -22,6 +22,7 @@ import { Chess } from "chess.js";
 import type { Square } from "chess.js";
 import { recognizeBoard, NotImplementedError } from "../recognition/recognizeBoard";
 import { shareUrl } from "../engine/positionLink";
+import { looksLikePgn, parsePgn, describeGame } from "../engine/pgn";
 import { readMaterial } from "../engine/material";
 import { MaterialBar } from "./MaterialBar";
 import { config } from "../config/config";
@@ -36,7 +37,7 @@ import {
   castlingIsPossible,
   type CastlingRight,
 } from "../engine/fen";
-import type { Fen } from "../config/types";
+import type { Fen, MoveLogEntry } from "../config/types";
 
 type EditMode = "play" | "setup";
 type BoardOrientation = "white" | "black";
@@ -147,6 +148,10 @@ interface BoardInputProps {
   // can tell "a move happened" (append to the log) apart from any other FEN
   // change - paste, setup edit, toggles, reset (start a fresh log).
   onFenChange: (fen: Fen, move?: { san: string; from: Square; to: Square }) => void;
+  // A whole game at once, from a pasted PGN. Separate from onFenChange because
+  // it replaces the move log rather than extending or resetting it - neither of
+  // that callback's two behaviours is right for a history arriving complete.
+  onGameLoad: (entries: MoveLogEntry[]) => void;
   arrows?: BoardArrow[]; // suggested-move arrows drawn on hover
   lastMove?: { from: Square; to: Square }; // highlighted on the board, independent of hover
 }
@@ -154,12 +159,20 @@ interface BoardInputProps {
 export function BoardInput({
   fen,
   onFenChange,
+  onGameLoad,
   arrows = [],
   lastMove,
 }: BoardInputProps) {
   const [fenText, setFenText] = useState(fen);
   const [fenError, setFenError] = useState<string | null>(null);
   const [recognitionNote, setRecognitionNote] = useState<string | null>(null);
+  // The outcome of the last PGN paste - what loaded, or why it didn't. Held
+  // until something else changes the position (see commitFen), rather than on a
+  // timer: a parse error is worth reading at your own pace, and the confirmation
+  // is the only thing distinguishing "loaded a game" from "the board changed".
+  const [pgnNote, setPgnNote] = useState<{ text: string; error: boolean } | null>(
+    null
+  );
   const [mode, setMode] = useState<EditMode>("play");
   const [orientation, setOrientation] = useState<BoardOrientation>("white");
   const [copied, setCopied] = useState(false);
@@ -403,6 +416,9 @@ export function BoardInput({
       return;
     }
     setFenError(null);
+    // Any deliberate position change retires the last paste's message - it
+    // describes a game that is no longer what's on the board.
+    setPgnNote(null);
     // Show what was actually committed, not what was typed. normalizeFen fills
     // in omitted fields and prunes castling rights the placement can't support,
     // so the raw text can otherwise sit there claiming a position we aren't
@@ -652,30 +668,66 @@ export function BoardInput({
     );
   }
 
-  function onPaste(e: ClipboardEvent) {
-    const item = [...(e.clipboardData?.items ?? [])].find((i) =>
-      i.type.startsWith("image/")
-    );
-    if (item) {
-      const file = item.getAsFile();
-      if (file) void handleFile(file);
+  // ---- pasting a game ----
+  // Replaces the whole move log with the pasted game and lands on its final
+  // position. The board and the FEN box are pushed there explicitly rather than
+  // left to the reconcile above, which holds off while an INPUT has focus - and
+  // the FEN box is exactly where someone is most likely to paste a game.
+  function loadPgnText(text: string) {
+    const result = parsePgn(text);
+    if (!result.ok) {
+      setPgnNote({ text: result.error, error: true });
+      return;
     }
+    const { entries } = result.game;
+    setFenError(null);
+    setFenText(entries[entries.length - 1].fen);
+    setPgnNote({ text: `Loaded ${describeGame(result.game)}.`, error: false });
+    onGameLoad(entries);
+  }
+
+  function onPaste(e: ClipboardEvent) {
+    // Images first, and only when recognition is on. An image paste carries no
+    // text to confuse the PGN path with, so the two never compete - but reading
+    // the image item first keeps it that way if a source ever offers both.
+    if (config.recognition.enabled) {
+      const item = [...(e.clipboardData?.items ?? [])].find((i) =>
+        i.type.startsWith("image/")
+      );
+      if (item) {
+        const file = item.getAsFile();
+        if (file) void handleFile(file);
+        return;
+      }
+    }
+
+    // Anything that isn't a game is left entirely alone, which is what keeps
+    // pasting a FEN into the box below working exactly as before - a FEN cannot
+    // satisfy looksLikePgn. Only once we're sure it IS a game do we take the
+    // paste over, since otherwise the text would land in the FEN box as well.
+    const text = e.clipboardData?.getData("text/plain") ?? "";
+    if (!looksLikePgn(text)) return;
+    e.preventDefault();
+    loadPgnText(text);
   }
 
   // Pasting is a page-level gesture: the paste event fires on whatever holds
   // focus, and on a fresh load that's <body> - which sits outside React's root
   // container, so an onPaste bound to this div never sees it and Ctrl+V does
-  // nothing at all. Listening on the window is what makes the advertised "or
-  // paste an image" actually work without clicking into the pane first.
-  // Pasting text is unaffected: this only reacts to an image item, so pasting a
-  // FEN into the box below still behaves normally.
+  // nothing at all. Listening on the window is what makes pasting a game work
+  // from anywhere on the page without clicking into something first.
   //
-  // Not registered while recognition is hidden - with no UI to report the
-  // result, an image paste would just call a stub that throws and swallow it.
+  // Registered unconditionally, unlike the version that only handled images:
+  // that one was gated on config.recognition.enabled, because with the upload UI
+  // hidden an image paste would only reach a stub that throws. PGN has no such
+  // dependency, and recognition is postponed indefinitely - gating the game path
+  // behind it would mean shipping a feature switched off by an unrelated flag.
+  //
+  // The handler closes over live state, so it routes through a ref kept current
+  // each render (same trick as the setup undo/redo keydown handler).
   const onPasteRef = useRef(onPaste);
   onPasteRef.current = onPaste;
   useEffect(() => {
-    if (!config.recognition.enabled) return;
     const handler = (e: ClipboardEvent) => onPasteRef.current(e);
     window.addEventListener("paste", handler);
     return () => window.removeEventListener("paste", handler);
@@ -1013,7 +1065,13 @@ export function BoardInput({
         placement · side (w/b) · castling (KQkq or -) · en passant · halfmove
         · fullmove — only placement is required, the rest default to w - - 0 1
       </p>
+      <p className="hint">
+        or paste a PGN (Ctrl/Cmd+V) anywhere on the page to load a whole game
+      </p>
       {fenError && <p className="error">{fenError}</p>}
+      {pgnNote && (
+        <p className={pgnNote.error ? "error" : "note"}>{pgnNote.text}</p>
+      )}
 
       {/* Hidden until recognizeBoard() is real - see config.recognition.enabled.
           The handlers below it stay wired, so flipping the flag restores this
