@@ -766,7 +766,15 @@ export function BoardInput({
               ...(showPressure ? squarePressureArrows : []),
             ]),
             // User-drawn arrows (right-drag) - version 4's customArrowColor.
-            arrowOptions: { ...defaultArrowOptions, color: "#e8663f" },
+            // 5.11 moved these into a `colors` map (one entry per modifier key)
+            // and deprecated the flat `color`, which it now reads only as
+            // `colors.default || color`. Spreading the defaults brings a
+            // `colors.default` along, so overriding `color` alone would be
+            // silently ignored and the arrows would come out amber.
+            arrowOptions: {
+              ...defaultArrowOptions,
+              colors: { ...defaultArrowOptions.colors, default: "#e8663f" },
+            },
             squareStyles: squareStyles,
             boardOrientation: orientation,
             // Version 5 sizes itself from CSS instead of taking a pixel
