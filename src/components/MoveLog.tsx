@@ -1,7 +1,7 @@
 // RIGHT PANE, below Best moves. Shows the played-move history as a standard
-// numbered move log, plus back/forward buttons to step through it. Stepping
-// changes the position shown everywhere (board + engine), same as if the
-// user had pasted that FEN directly.
+// numbered move log, plus buttons to step through it one move at a time or jump
+// to either end. Moving changes the position shown everywhere (board + engine),
+// same as if the user had pasted that FEN directly.
 
 import { useLayoutEffect, useRef, useState } from "react";
 import { getSideToMove, STARTING_FEN } from "../engine/fen";
@@ -18,6 +18,8 @@ interface MoveLogProps {
   currentIndex: number;
   onBack: () => void;
   onForward: () => void;
+  onFirst: () => void;
+  onLast: () => void;
 }
 
 interface LogCell {
@@ -145,7 +147,14 @@ function useScrollCurrentIntoView(
   }, [listRef, rowRef, currentIndex, rowCount]);
 }
 
-export function MoveLog({ entries, currentIndex, onBack, onForward }: MoveLogProps) {
+export function MoveLog({
+  entries,
+  currentIndex,
+  onBack,
+  onForward,
+  onFirst,
+  onLast,
+}: MoveLogProps) {
   const rows = buildRows(entries);
   const [copied, setCopied] = useState(false);
   const listRef = useRef<HTMLOListElement | null>(null);
@@ -177,7 +186,19 @@ export function MoveLog({ entries, currentIndex, onBack, onForward }: MoveLogPro
           >
             {copied ? "Copied!" : "Copy PGN"}
           </button>
+          {/* Jump and step share the same two disabled conditions: at the
+              start of the log neither backwards control has anywhere to go, and
+              at the live position neither forwards one does. */}
           <div className="move-nav">
+            <button
+              type="button"
+              onClick={onFirst}
+              disabled={currentIndex === 0}
+              aria-label="First move"
+              title="Start of the game (Home)"
+            >
+              &lt;&lt;
+            </button>
             <button
               type="button"
               onClick={onBack}
@@ -195,6 +216,15 @@ export function MoveLog({ entries, currentIndex, onBack, onForward }: MoveLogPro
               title="Next move (→)"
             >
               &gt;
+            </button>
+            <button
+              type="button"
+              onClick={onLast}
+              disabled={currentIndex === entries.length - 1}
+              aria-label="Last move"
+              title="Latest position (End)"
+            >
+              &gt;&gt;
             </button>
           </div>
         </div>

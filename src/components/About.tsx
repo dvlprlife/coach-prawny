@@ -167,10 +167,15 @@ export function About({ onClose, backHref }: AboutProps) {
           <strong>Reset board</strong> returns to the starting position.
         </li>
         <li>
-          Step through the move history with the <strong>‹ ›</strong> buttons or
-          the <strong>← →</strong> arrow keys, and <strong>Copy PGN</strong> to
-          export the game - which you can paste straight back in to pick it up
-          again later.
+          Step through the move history with the <strong>&lt; &gt;</strong>{" "}
+          buttons or the <strong>← →</strong> arrow keys. <strong>&lt;&lt;</strong>{" "}
+          and <strong>&gt;&gt;</strong> - or <strong>Home</strong> and{" "}
+          <strong>End</strong> - jump straight to the start of the game and back
+          to the latest position.
+        </li>
+        <li>
+          <strong>Copy PGN</strong> exports the game - which you can paste
+          straight back in to pick it up again later.
         </li>
       </ul>
 

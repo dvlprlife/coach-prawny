@@ -34,6 +34,11 @@ const ARROW_COLORS: Record<number, string> = {
 };
 const FALLBACK_ARROW_COLOR = "#b0a99a"; // muted, for ranks beyond the palette above
 
+// The keys that drive the move history. Home/End sit alongside the arrows here
+// because they want every one of the guards the handler applies - modifiers,
+// text entry, and the About panel being open.
+const NAV_KEYS = new Set(["ArrowLeft", "ArrowRight", "Home", "End"]);
+
 // The move log doubles as the position's undo/redo history: `entries[0]` is
 // the position the log started from (no `san`), and `index` is where on that
 // timeline the board is currently showing. Playing a move while `index` isn't
@@ -203,18 +208,32 @@ export default function App() {
     setGame((g) => ({ ...g, index: Math.min(g.entries.length - 1, g.index + 1) }));
   }
 
-  // Left/right arrows step through the move history, the way every chess site
-  // behaves. Bound to the window rather than a focused element so it works
-  // without clicking anything first - which means it has to stay out of the way
-  // of text entry: the FEN box needs its arrow keys for the caret, and the
-  // "Show N" <select> needs them to change value. Modified presses are left to
-  // the browser (Alt+Left is Back).
+  // Jump to either end of the history instead of stepping to it. `entries`
+  // always holds at least the position the log started from, so the ends are 0
+  // and length - 1 with nothing to clamp. These earn their place on a long game:
+  // holding → back to the live position runs a search on every position it
+  // passes through, where landing on it directly costs exactly one.
+  function goToStart() {
+    setGame((g) => ({ ...g, index: 0 }));
+  }
+
+  function goToEnd() {
+    setGame((g) => ({ ...g, index: g.entries.length - 1 }));
+  }
+
+  // Left/right arrows step through the move history and Home/End jump to its
+  // ends, the way every chess site behaves. Bound to the window rather than a
+  // focused element so it works without clicking anything first - which means it
+  // has to stay out of the way of text entry: the FEN box needs its arrow keys
+  // for the caret and Home/End to reach the ends of the line, and the "Show N"
+  // <select> needs the arrows to change value. Modified presses are left to the
+  // browser (Alt+Left is Back).
   //
-  // goBack/goForward only ever call setGame with an updater, so the listener can
-  // be registered once and still act on the current history.
+  // All four handlers only ever call setGame with an updater, so the listener
+  // can be registered once and still act on the current history.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      if (!NAV_KEYS.has(e.key)) return;
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
       // The board isn't on screen behind the About panel - stepping the history
       // there would move an invisible position and kick off a pointless search.
@@ -227,7 +246,9 @@ export default function App() {
 
       e.preventDefault();
       if (e.key === "ArrowLeft") goBack();
-      else goForward();
+      else if (e.key === "ArrowRight") goForward();
+      else if (e.key === "Home") goToStart();
+      else goToEnd();
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -351,6 +372,8 @@ export default function App() {
               currentIndex={game.index}
               onBack={goBack}
               onForward={goForward}
+              onFirst={goToStart}
+              onLast={goToEnd}
             />
           </section>
         </main>
