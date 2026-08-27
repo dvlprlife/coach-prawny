@@ -179,6 +179,26 @@ export function About({ onClose, backHref }: AboutProps) {
         </li>
       </ul>
 
+      <h2>Notes</h2>
+      <p>
+        Below the move log is a notepad. <strong>+ Add note</strong> writes a
+        note against whichever position is on the board at the time, so the
+        panel says which move each note belongs to and clicking one takes you
+        back to that position. Notes stay in game order however you write them,
+        and <strong>Enter</strong> saves while <strong>Shift+Enter</strong>{" "}
+        starts a new line.
+      </p>
+      <p>
+        Notes are a scratchpad for one sitting, not a saved document. They live
+        in the page and nowhere else: they are not stored on your device, they
+        do not travel in a shared link, and reloading starts an empty pad.
+        Because every note is pinned to a move, anything that replaces the move
+        log clears them too - pasting a position or a PGN, editing the board in
+        Set up mode, or changing whose turn it is. Playing a different move from
+        part-way back drops the notes on the moves it discards, and keeps the
+        rest.
+      </p>
+
       <h2>How it works</h2>
       <p>
         Everything runs client-side: the board editor, the move history, and

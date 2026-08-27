@@ -615,3 +615,138 @@ a.action-btn {
 .move-log-row .quality.inaccuracy { color: var(--prawn-flat); }
 .move-log-row .quality.mistake { color: var(--prawn); }
 .move-log-row .quality.blunder { color: var(--threat); }
+
+/* ---- Notes ---------------------------------------------------------------
+   Sits below Moves and deliberately echoes it: same header shape, same 16px
+   green heading, same 260px scroll cap. The difference is that a note row is
+   variable height (the text wraps), so the cap is a max-height on the list and
+   the rows size themselves - the move log can fix its row height because a
+   move is always one short token. */
+.note-log { margin-top: 24px; }
+.note-log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.note-log-header h2 {
+  font-size: 16px;
+  margin: 0;
+  color: var(--board-green);
+}
+.note-log-header .action-btn { font-size: 13px; padding: 4px 10px; }
+
+.note-compose {
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.note-compose-target {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.note-compose-target strong {
+  color: var(--board-green);
+  font-family: ui-monospace, monospace;
+}
+.note-draft {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.note-draft:focus {
+  outline: none;
+  border-color: var(--prawn);
+}
+.note-compose-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+}
+.note-hint { font-size: 11px; color: var(--muted); }
+
+.note-log-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  /* Same visual cap as the move log's ten rows, so the two panels stop at the
+     same depth instead of one running away down the page. */
+  max-height: 260px;
+  overflow-y: auto;
+}
+.note-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  border-radius: 4px;
+}
+.note-row + .note-row { margin-top: 2px; }
+.note-row.current { background: var(--prawn-flat-log); }
+
+/* The row itself is the jump control, so it has to be a button - stripped back
+   to look like a row of text rather than a control, but still focusable and
+   reachable by keyboard. */
+.note-jump {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 5px 6px;
+  cursor: pointer;
+  font: inherit;
+  border-radius: 4px;
+}
+.note-jump:hover { background: rgba(0, 0, 0, 0.04); }
+.note-move {
+  flex: none;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--muted);
+  /* Wide enough for "12... Nxe4" without pushing the text around from row to
+     row; longer labels simply take the space they need. */
+  min-width: 62px;
+}
+.note-text {
+  font-size: 13px;
+  line-height: 1.45;
+  /* A pasted paragraph must wrap rather than stretch the panel sideways, and a
+     single long unbroken string must break rather than overflow it. */
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.note-delete {
+  flex: none;
+  align-self: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 4px;
+  cursor: pointer;
+  /* Dimmed rather than hidden until hover. Fading it to nothing looks tidier on
+     a desktop and strands it on a touch screen, where there is no hover to
+     bring it back and the control would be invisible but still tappable. */
+  opacity: 0.4;
+  transition: opacity 120ms ease;
+}
+.note-row:hover .note-delete,
+.note-delete:focus-visible { opacity: 1; }
+.note-delete:hover { color: var(--threat); background: rgba(0, 0, 0, 0.05); }

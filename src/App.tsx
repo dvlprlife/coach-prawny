@@ -2,7 +2,7 @@
 // Owns the FEN state, drives analysis, and lifts the hovered-move state so a
 // suggested move drawn in the right pane shows as an arrow on the left board.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Chess } from "chess.js";
 // The Stockfish worker + its .wasm are served from public/engine/ so they stay
 // side by side (the worker loads the .wasm by relative path at runtime; bundling
@@ -17,12 +17,13 @@ const stockfishUrl = "/engine/stockfish-18-lite-single.js";
 import { BoardInput, type BoardArrow, type Square } from "./components/BoardInput";
 import { MoveList } from "./components/MoveList";
 import { MoveLog } from "./components/MoveLog";
+import { NoteLog } from "./components/NoteLog";
 import { About } from "./components/About";
 import { useStockfish } from "./engine/useStockfish";
 import { STARTING_FEN } from "./engine/fen";
 import { fenFromSearch, searchForFen } from "./engine/positionLink";
 import { config } from "./config/config";
-import type { Fen, MoveLogEntry } from "./config/types";
+import type { Fen, MoveLogEntry, PositionNote } from "./config/types";
 import "./App.css";
 
 // Arrow color per rank: best move in prawn-coral, second in sage green, rest
@@ -43,9 +44,16 @@ const NAV_KEYS = new Set(["ArrowLeft", "ArrowRight", "Home", "End"]);
 // the position the log started from (no `san`), and `index` is where on that
 // timeline the board is currently showing. Playing a move while `index` isn't
 // at the end truncates the "future" - same as any undo-then-branch history.
+// Notes live in here rather than in their own useState because every note
+// points at an entry by index, and that invariant is only cheap to hold if the
+// two move together. Truncating the log has to drop the notes hanging off the
+// moves it just discarded, in the same updater that does the truncating - split
+// across two setState calls, the filter would have to guess at the index the
+// other one landed on.
 interface GameState {
   entries: MoveLogEntry[];
   index: number;
+  notes: PositionNote[];
 }
 
 export default function App() {
@@ -58,7 +66,13 @@ export default function App() {
   const [game, setGame] = useState<GameState>(() => ({
     entries: [{ fen: fenFromSearch(window.location.search) ?? STARTING_FEN }],
     index: 0,
+    notes: [],
   }));
+  // Note ids only have to be unique within the session, and they're generated
+  // in the handler rather than inside the setGame updater on purpose: StrictMode
+  // runs updaters twice in development, which would burn two ids per note and
+  // (worse) hand the two invocations different ones.
+  const nextNoteId = useRef(1);
   const fen = game.entries[game.index].fen;
   // Two ways a suggested move becomes an arrow on the board: hovering a move
   // row previews one transiently, and clicking a row pins one so it stays after
@@ -107,9 +121,20 @@ export default function App() {
             { fen: newFen, san: move.san, from: move.from, to: move.to },
           ],
           index: truncated.length,
+          // Playing a move from part-way back throws away the moves that came
+          // after it, so any note pinned to one of them is now pinned to
+          // nothing. Dropping them here is the only place that can be done
+          // correctly - `g.index` is the cut, and it's only in scope inside
+          // this updater. Notes on the surviving moves keep their indices,
+          // which the slice above leaves untouched.
+          notes: g.notes.filter((n) => n.index <= g.index),
         };
       }
-      return { entries: [{ fen: newFen }], index: 0 };
+      // Not a continuation: a pasted FEN, a setup edit, a castling or
+      // side-to-move toggle. The log is replaced, so the notes describe moves
+      // that are no longer there - keeping them would leave "3. Nf3 - the pin
+      // is the idea" sitting against whatever move 3 happens to be next.
+      return { entries: [{ fen: newFen }], index: 0, notes: [] };
     });
   }
 
@@ -128,7 +153,8 @@ export default function App() {
   // running the engine over 40 positions before showing anything.
   function loadGame(entries: MoveLogEntry[]) {
     if (entries.length === 0) return;
-    setGame({ entries, index: entries.length - 1 });
+    // A different game entirely - same reasoning as the reset above.
+    setGame({ entries, index: entries.length - 1, notes: [] });
   }
 
   // Clicking a suggested move plays it, exactly as though it had been dragged:
@@ -219,6 +245,28 @@ export default function App() {
 
   function goToEnd() {
     setGame((g) => ({ ...g, index: g.entries.length - 1 }));
+  }
+
+  // Clicking a note goes back to the position it was written about. Clamped
+  // rather than trusted: a note's index is kept in step with the log by the
+  // updaters above, and this is the cheap guard that keeps a slip there from
+  // reading past the end of the array.
+  function goToIndex(index: number) {
+    setGame((g) => ({
+      ...g,
+      index: Math.min(Math.max(0, index), g.entries.length - 1),
+    }));
+  }
+
+  // A note pins to whatever position is showing when it's saved, which is what
+  // makes it findable again later.
+  function addNote(text: string) {
+    const id = nextNoteId.current++;
+    setGame((g) => ({ ...g, notes: [...g.notes, { id, index: g.index, text }] }));
+  }
+
+  function deleteNote(id: number) {
+    setGame((g) => ({ ...g, notes: g.notes.filter((n) => n.id !== id) }));
   }
 
   // Left/right arrows step through the move history and Home/End jump to its
@@ -374,6 +422,14 @@ export default function App() {
               onForward={goForward}
               onFirst={goToStart}
               onLast={goToEnd}
+            />
+            <NoteLog
+              entries={game.entries}
+              currentIndex={game.index}
+              notes={game.notes}
+              onAdd={addNote}
+              onDelete={deleteNote}
+              onJump={goToIndex}
             />
           </section>
         </main>

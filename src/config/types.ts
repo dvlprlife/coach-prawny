@@ -30,6 +30,20 @@ export interface RecognitionResult {
   confidence?: number; // 0-1, optional; server models may report it
 }
 
+// A free-text note pinned to one position in the move log. `index` addresses
+// MoveLogEntry[] the same way GameState.index does, which is what lets a note
+// jump the board back to the move it was written about.
+//
+// That also makes a note only meaningful against the log it was written on: a
+// pasted position or a new game renumbers everything, so notes are cleared
+// whenever the log is replaced rather than left pointing at unrelated moves.
+// They live in memory only - reloading the page starts an empty pad.
+export interface PositionNote {
+  id: number;
+  index: number;
+  text: string;
+}
+
 // One step in the played-move history. The root entry (index 0) has no
 // `san`/`from`/`to` - it's the position the log started from, not a move.
 //
