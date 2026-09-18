@@ -11,7 +11,7 @@
 // plus a second set drawn locally when hovering a piece on the board (its own
 // legal destinations, play mode only).
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { Chessboard, defaultArrowOptions } from "react-chessboard";
 import type { PieceDropHandlerArgs, SquareHandlerArgs } from "react-chessboard";
 import { Chess } from "chess.js";
@@ -229,8 +229,17 @@ export function BoardInput({
   // render, which should make this unnecessary - but the failure mode is silent
   // and position-corrupting, and a stable ref costs nothing, so it stays as a
   // guard rather than something to prove unnecessary and remove.
+  //
+  // Assigned from an effect rather than during render. `react/refs` objects to
+  // mutating a ref mid-render, and nothing here needs it current before
+  // commit: every reader is a drag callback from react-chessboard, which can
+  // only fire after one. A mode change arrives as a click, and React flushes
+  // this effect before any later pointer event can reach the board, so the
+  // guard still covers the case it was written for.
   const latestRef = useRef({ mode, fen });
-  latestRef.current = { mode, fen };
+  useEffect(() => {
+    latestRef.current = { mode, fen };
+  });
 
   // The board's hover/pin arrows: a piece's legal moves (blue when it's that
   // side's turn, gray when previewing the other side's piece) plus the pressure
@@ -297,9 +306,15 @@ export function BoardInput({
   // A pinned square belongs to the position it was set on; drop it on any board
   // change so its arrows can't linger onto a position where the piece has moved
   // or vanished. (The Best-moves pin clears the same way.)
-  useEffect(() => {
+  //
+  // Adjusted during render rather than from an effect, so the board never
+  // paints a frame with the previous position's arrows still on it - an effect
+  // clears them a render late, which shows as a flicker.
+  const [pinnedForFen, setPinnedForFen] = useState(fen);
+  if (pinnedForFen !== fen) {
+    setPinnedForFen(fen);
     setPinnedSquare(null);
-  }, [fen]);
+  }
 
   // ---- Set up mode undo/redo ----
   // Record every position change made while in Set up mode so it can be stepped
@@ -324,10 +339,19 @@ export function BoardInput({
 
   // A fresh history each time the mode changes, so entering Set up starts clean
   // and leaving it doesn't leave a stale stack pointing at old positions.
-  useEffect(() => {
+  //
+  // Done from the one place the mode actually changes - the two buttons below -
+  // rather than from an effect watching `mode`. The same-mode guard is the
+  // part that matters: clicking the already-active button calls setMode with
+  // the value it already has, which React bails out of without re-rendering,
+  // so the old effect never fired. Clearing unconditionally here would instead
+  // throw away a live undo stack on a redundant click.
+  function changeMode(next: EditMode) {
+    if (next === mode) return;
+    setMode(next);
     setSetupPast([]);
     setSetupFuture([]);
-  }, [mode]);
+  }
 
   const canUndoSetup = mode === "setup" && setupPast.length > 0;
   const canRedoSetup = mode === "setup" && setupFuture.length > 0;
@@ -352,12 +376,15 @@ export function BoardInput({
 
   // Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z (or +Y) drive the same undo/redo while in
   // Set up mode. Bound to the window so it works without focusing a control, but
-  // held off while typing in the FEN box. The handler closes over live state, so
-  // it routes through refs kept current each render (same trick as onPaste).
-  const undoRef = useRef(undoSetup);
-  const redoRef = useRef(redoSetup);
-  undoRef.current = undoSetup;
-  redoRef.current = redoSetup;
+  // held off while typing in the FEN box.
+  //
+  // `undoSetup`/`redoSetup` read the live undo stacks, but the listener is
+  // registered once per mode - so they are wrapped as effect events, which
+  // always see the current render's values without the effect having to depend
+  // on them and re-subscribe on every edit. This is what the pair of
+  // assigned-during-render refs here used to do by hand.
+  const onUndo = useEffectEvent(() => undoSetup());
+  const onRedo = useEffectEvent(() => redoSetup());
   useEffect(() => {
     if (mode !== "setup") return;
     function onKeyDown(e: KeyboardEvent) {
@@ -368,10 +395,10 @@ export function BoardInput({
       const key = e.key.toLowerCase();
       if (key === "z" && !e.shiftKey) {
         e.preventDefault();
-        undoRef.current();
+        onUndo();
       } else if ((key === "z" && e.shiftKey) || key === "y") {
         e.preventDefault();
-        redoRef.current();
+        onRedo();
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -723,12 +750,15 @@ export function BoardInput({
   // dependency, and recognition is postponed indefinitely - gating the game path
   // behind it would mean shipping a feature switched off by an unrelated flag.
   //
-  // The handler closes over live state, so it routes through a ref kept current
-  // each render (same trick as the setup undo/redo keydown handler).
-  const onPasteRef = useRef(onPaste);
-  onPasteRef.current = onPaste;
+  // The handler reads live state, but the listener is registered once for the
+  // life of the component, so it goes through an effect event - which always
+  // sees the current render's values without the effect depending on them
+  // (same shape as the setup undo/redo keydown handler). The wrapper arrow is
+  // deliberate: effect events are not meant to be handed to anything outside
+  // the effect, and `addEventListener` would be exactly that.
+  const onPasteEvent = useEffectEvent((e: ClipboardEvent) => onPaste(e));
   useEffect(() => {
-    const handler = (e: ClipboardEvent) => onPasteRef.current(e);
+    const handler = (e: ClipboardEvent) => onPasteEvent(e);
     window.addEventListener("paste", handler);
     return () => window.removeEventListener("paste", handler);
   }, []);
@@ -839,14 +869,14 @@ export function BoardInput({
             <span>Board mode</span>
             <button
               className={mode === "play" ? "active" : ""}
-              onClick={() => setMode("play")}
+              onClick={() => changeMode("play")}
               title="Only legal moves; auto-updates whose turn it is"
             >
               Play
             </button>
             <button
               className={mode === "setup" ? "active" : ""}
-              onClick={() => setMode("setup")}
+              onClick={() => changeMode("setup")}
               title="Freely place pieces to build any position"
             >
               Set up
