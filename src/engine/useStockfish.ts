@@ -18,6 +18,13 @@ import type { AnalysisResult, Fen } from "../config/types";
 interface UseStockfishOptions {
   workerUrl: string;
   debounceMs?: number;
+  // Called once per accepted (non-stale) result, as it lands. This exists so a
+  // caller that needs to RECORD each result - rather than just render the
+  // latest one - can do it from the event that delivered it, instead of an
+  // effect watching `result`. An effect there re-runs on every dependency
+  // change and has to defend against writing the same value twice; this fires
+  // exactly once per result.
+  onResult?: (result: AnalysisResult) => void;
 }
 
 interface UseStockfishState {
@@ -30,6 +37,7 @@ interface UseStockfishState {
 export function useStockfish({
   workerUrl,
   debounceMs = 300,
+  onResult,
 }: UseStockfishOptions): UseStockfishState {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -39,6 +47,23 @@ export function useStockfish({
   // newer one has since been made - whether the fen changed, just multiPv
   // changed, or both. A fen-only check would miss the multiPv-only case.
   const requestId = useRef(0);
+
+  // `onResult` is typically an inline arrow, so it is a new function on every
+  // render. It is read through a ref to keep it out of `run`'s dependencies:
+  // listed there, `run` would be rebuilt each render and `analyzeDebounced`
+  // with it - and callers pass that to a `useEffect`, so every render would
+  // kick off another search.
+  //
+  // Assigned from an effect rather than during render, which is both what the
+  // `react/refs` rule asks for and correct here: the ref is only ever read
+  // from a promise continuation, long after commit, so it has no reason to be
+  // current mid-render. `useEffectEvent` would be the modern shape for this
+  // and is deliberately not used - those functions may only be called from
+  // Effects, and this fires from inside a debounced callback.
+  const onResultRef = useRef(onResult);
+  useEffect(() => {
+    onResultRef.current = onResult;
+  });
 
   const run = useCallback(
     (fen: Fen, multiPv?: number) => {
@@ -52,6 +77,7 @@ export function useStockfish({
           if (id === requestId.current) {
             setResult(res);
             setAnalyzing(false);
+            onResultRef.current?.(res);
           }
         })
         .catch((e: unknown) => {

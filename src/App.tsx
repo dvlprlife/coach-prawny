@@ -103,6 +103,20 @@ export default function App() {
   function handleMoveCountChange(count: number) {
     setMoveCount(count);
     if (count > 0) setEngineMultiPv(count);
+    // Hiding the list has to drop the arrows with it. A pin is unpinned by
+    // clicking its row, so a pinned arrow outliving the rows would be stuck on
+    // the board with nothing left to click - and a hover can outlive them too,
+    // since React fires no mouseleave for a row that unmounts under the cursor.
+    // Both would also defeat the point of hiding the moves: the answer would
+    // still be drawn across the board.
+    //
+    // Done here rather than from an effect on `moveCount` because this is the
+    // only place `moveCount` ever changes, so the two are equivalent - and this
+    // is the event that caused it.
+    else {
+      setPinnedUci(null);
+      setHoveredUci(null);
+    }
   }
 
   // A played move (from BoardInput's play mode) extends the log; any other
@@ -209,22 +223,19 @@ export default function App() {
   // changes underneath it - a played move, paste, setup edit, or a back/forward
   // step - so a locked arrow can't linger onto a position where its move may
   // not even be legal. (goBack/goForward don't route through handleFenChange,
-  // so keying this off `fen` is what covers every path.)
-  useEffect(() => {
+  // so keying this off `fen` is what covers every path - the seven call sites
+  // that move the position are exactly what would rot if enumerated here.)
+  //
+  // Adjusted during render rather than from an effect: React re-runs the
+  // component immediately on this, before committing or painting, so no frame
+  // is ever shown with the stale arrow still drawn. Clearing it from an effect
+  // lands a render later, which is a visible flash of the previous position's
+  // arrow on the new board.
+  const [pinnedForFen, setPinnedForFen] = useState(fen);
+  if (pinnedForFen !== fen) {
+    setPinnedForFen(fen);
     setPinnedUci(null);
-  }, [fen]);
-
-  // Hiding the list has to drop the arrows with it. A pin is unpinned by
-  // clicking its row, so a pinned arrow outliving the rows would be stuck on
-  // the board with nothing left to click - and a hover can outlive them too,
-  // since React fires no mouseleave for a row that unmounts under the cursor.
-  // Both would also defeat the point of hiding the moves: the answer would
-  // still be drawn across the board.
-  useEffect(() => {
-    if (moveCount > 0) return;
-    setPinnedUci(null);
-    setHoveredUci(null);
-  }, [moveCount]);
+  }
 
   function goBack() {
     setGame((g) => ({ ...g, index: Math.max(0, g.index - 1) }));
@@ -302,8 +313,49 @@ export default function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [showAbout]);
 
+  // Record each position's evaluation onto its own move-log entry as the
+  // analysis lands. That's what lets MoveLog judge a move: comparing the score
+  // of the position before it with the score after.
+  //
+  // Driven by the result arriving rather than by an effect watching `result`:
+  // this runs exactly once per analysis, where the effect re-ran on every
+  // change to `result` or `fen` and needed its equality check purely to stop
+  // itself looping. That check is kept below, but now only to skip a pointless
+  // re-render when a position is re-analyzed to the same numbers - stepping
+  // away and back does that.
+  //
+  // Only the entry the result actually belongs to is ever written:
+  // `entry.fen !== res.fen` is what turns a result landing after the board has
+  // moved into a no-op instead of scoring the wrong move.
+  //
+  // A position only gets scored once it has been analyzed, so playing faster
+  // than the search completes leaves entries unscored - those moves simply go
+  // unannotated, and fill in if you step back through them later.
   const { result, analyzing, error, analyze } = useStockfish({
     workerUrl: stockfishUrl,
+    onResult: (res) => {
+      const best = res.moves.find((m) => m.rank === 1);
+      if (!best) return;
+      setGame((g) => {
+        const entry = g.entries[g.index];
+        if (!entry || entry.fen !== res.fen) return g;
+        if (
+          entry.evalCp === best.evalCp &&
+          entry.mateIn === best.mateIn &&
+          entry.bestUci === best.move
+        ) {
+          return g;
+        }
+        const entries = g.entries.slice();
+        entries[g.index] = {
+          ...entry,
+          evalCp: best.evalCp,
+          mateIn: best.mateIn,
+          bestUci: best.move,
+        };
+        return { ...g, entries };
+      });
+    },
   });
 
   // The move that produced the currently-displayed position, whatever put us
@@ -320,41 +372,6 @@ export default function App() {
   useEffect(() => {
     analyze(fen, engineMultiPv);
   }, [fen, engineMultiPv, analyze]);
-
-  // Record each position's evaluation onto its own move-log entry as the
-  // analysis lands. That's what lets MoveLog judge a move: comparing the score
-  // of the position before it with the score after. Only the entry currently on
-  // the board is ever written, and only when the result actually belongs to it
-  // (a result for a different fen is stale). Returning `g` unchanged when the
-  // numbers already match is what stops this from re-rendering itself forever.
-  //
-  // A position only gets scored once it has been analyzed, so playing faster
-  // than the search completes leaves entries unscored - those moves simply go
-  // unannotated, and fill in if you step back through them later.
-  useEffect(() => {
-    if (!result || result.fen !== fen) return;
-    const best = result.moves.find((m) => m.rank === 1);
-    if (!best) return;
-    setGame((g) => {
-      const entry = g.entries[g.index];
-      if (!entry || entry.fen !== result.fen) return g;
-      if (
-        entry.evalCp === best.evalCp &&
-        entry.mateIn === best.mateIn &&
-        entry.bestUci === best.move
-      ) {
-        return g;
-      }
-      const entries = g.entries.slice();
-      entries[g.index] = {
-        ...entry,
-        evalCp: best.evalCp,
-        mateIn: best.mateIn,
-        bestUci: best.move,
-      };
-      return { ...g, entries };
-    });
-  }, [result, fen]);
 
   // Translate the active UCI move (e.g. "e2e4") into a board arrow tuple. The
   // hovered move wins while the pointer is on a row; otherwise the pinned one

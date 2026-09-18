@@ -34,23 +34,12 @@
     "react-hooks/rules-of-hooks": "error",
     "react-hooks/exhaustive-deps": "error",
 
-    // Demoted to `warn`, deliberately and temporarily — see issue #47.
-    //
-    // oxlint 1.81 moved both of these into `correctness`, which the category
-    // above turns on wholesale, so they armed themselves and failed CI without
-    // a line of app code changing. They flag 9 existing sites: the "drop the
-    // pin when the board changes" effects, the engine-result writeback, and
-    // the `ref.current = <live value>` assignments that let the window-level
-    // paste/keydown listeners read current state without re-subscribing.
-    //
-    // None of the 9 is accidental and each carries a comment explaining
-    // itself, but the rules are pointing at real constraints — the ref group
-    // is what `useEffectEvent` exists to replace. Resolving them means
-    // rewriting 9 React state and ref sites in the one layer with no test
-    // coverage, which does not belong in a dependency bump. `warn` keeps them
-    // visible in lint output instead of silently off; #47 restores `error`.
-    "react/set-state-in-effect": "warn",
-    "react/refs": "warn"
+    // Arrived in `correctness` with oxlint 1.81 and briefly held at `warn`
+    // while the 9 sites they flagged were resolved (#47). Back to `error` and
+    // pinned explicitly rather than left to the category, so a future
+    // re-categorisation upstream can't quietly switch them off.
+    "react/set-state-in-effect": "error",
+    "react/refs": "error"
   },
 
   // dist/ is build output; public/engine/ is gitignored Stockfish WASM glue
