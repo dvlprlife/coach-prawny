@@ -132,7 +132,8 @@ export function About({ onClose, backHref }: AboutProps) {
         Moves you play are annotated in the move log by comparing the
         evaluation before the move with the evaluation after it - how much the
         position got worse for you, in pawns. Hover an annotation to see how
-        much was given up.
+        much was given up, or open{" "}
+        <strong>What do the marks mean?</strong> under the move list for a key.
       </p>
       <ul>
         <li>
