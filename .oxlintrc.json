@@ -16,6 +16,22 @@
   // deliberately: it is the "outright wrong" tier. The wider categories
   // (pedantic, style, restriction) are noisy enough on this codebase that they
   // would train people to ignore lint output.
+  //
+  // A CATEGORY, not a list of rules, and that is a real trade-off rather than
+  // an oversight. It means the installed oxlint decides what is enforced, so a
+  // bump can start failing CI with no application code having changed — which
+  // is exactly what oxlint 1.81 did (#47: two new rules, nine existing sites).
+  //
+  // Kept anyway. That episode is the argument FOR it, not against: the nine
+  // were real, the fix was a genuine improvement, and the failure landed on the
+  // Dependabot PR where the ruleset holds it — `main` was never broken. Pinning
+  // 160 rules by hand to avoid it would freeze the set, never surface another
+  // one, and bury this file under a wall nobody reads.
+  //
+  // What the episode actually cost was diagnosis, not the breakage: GitHub's
+  // log strips rule names from the error lines, so the CI output cannot tell
+  // you WHICH rule arrived. .oxlint-rules.txt answers that — regenerate it with
+  // `npm run lint:rules` and diff. See scripts/oxlint-rules.mjs.
   "categories": {
     "correctness": "error"
   },
