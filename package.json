@@ -10,6 +10,7 @@
     "build": "tsc && vite build && npm run build-about",
     "build-about": "node scripts/build-about.mjs",
     "lint": "oxlint",
+    "lint:rules": "node scripts/oxlint-rules.mjs",
     "test": "vitest run",
     "preview": "vite preview",
     "sync-engine": "node scripts/sync-engine.mjs"
