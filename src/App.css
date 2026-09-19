@@ -611,10 +611,58 @@ a.action-btn {
   font-weight: 700;
   font-size: 13px;
 }
-.move-log-row .quality.best { color: var(--sage); }
-.move-log-row .quality.inaccuracy { color: var(--prawn-flat); }
-.move-log-row .quality.mistake { color: var(--prawn); }
-.move-log-row .quality.blunder { color: var(--threat); }
+/* The colours deliberately are NOT scoped to the log row: the legend below
+   reuses these same classes, and a key whose marks didn't match the marks in
+   the list would be worse than no key at all. */
+.quality.best { color: var(--sage); }
+.quality.inaccuracy { color: var(--prawn-flat); }
+.quality.mistake { color: var(--prawn); }
+.quality.blunder { color: var(--threat); }
+
+/* ---- Move-quality legend --------------------------------------------------
+   Collapsed by default: the marks are worth explaining once, not worth a
+   permanent row in a panel that already caps the move list at 10 rows to keep
+   the page from growing. <details> gives keyboard operation and the right
+   announcement for free, so there is no state and no button here. */
+.quality-legend {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.quality-legend summary {
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  user-select: none;
+}
+.quality-legend summary:hover { color: var(--ink); }
+.quality-legend summary:focus-visible {
+  outline: 2px solid var(--prawn);
+  outline-offset: 1px;
+}
+/* Two columns of mark/meaning pairs. A <dl> because that is what this is; the
+   wrapping <div> per pair is what lets the grid place dt and dd as one unit. */
+.quality-legend dl {
+  display: grid;
+  grid-template-columns: repeat(2, auto 1fr);
+  gap: 3px 8px;
+  margin: 6px 0 0;
+  padding: 0 6px;
+}
+.quality-legend dl > div {
+  display: contents;
+}
+.quality-legend dt {
+  font-family: ui-monospace, monospace;
+  font-weight: 700;
+  text-align: right;
+}
+.quality-legend dd { margin: 0; }
+.quality-legend p {
+  margin: 6px 0 0;
+  padding: 0 6px;
+  line-height: 1.45;
+}
 
 /* ---- Notes ---------------------------------------------------------------
    Sits below Moves and deliberately echoes it: same header shape, same 16px

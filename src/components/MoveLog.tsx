@@ -10,6 +10,7 @@ import {
   QUALITY_GLYPH,
   QUALITY_LABEL,
   type MoveAssessment,
+  type MoveQuality,
 } from "../engine/moveQuality";
 import type { MoveLogEntry } from "../config/types";
 
@@ -86,6 +87,45 @@ function Annotation({ assessment }: { assessment: MoveAssessment | null }) {
     <span className={`quality ${assessment.quality}`} title={assessmentTitle(assessment)}>
       {glyph}
     </span>
+  );
+}
+
+// A key for the annotations, collapsed by default. The marks are the only part
+// of this panel that isn't self-explanatory: "??" reads as bad without help,
+// but "?!" versus "?" does not, and the absence of a mark carries meaning that
+// nothing on screen can reveal - hovering an unmarked move shows nothing,
+// because there is no element there to hover.
+//
+// Built from QUALITY_GLYPH/QUALITY_LABEL rather than written out, so retuning a
+// band or renaming a verdict can't leave a stale second copy here. "good" drops
+// out of the list on its own - its glyph is deliberately empty - and the
+// unmarked case is spelled out underneath instead, where it can also cover the
+// not-yet-analyzed case that looks identical.
+//
+// <details> rather than a button and some state: it is keyboard-operable and
+// announced as a disclosure for free, and the closed state costs one line.
+function QualityLegend() {
+  // Insertion order in QUALITY_GLYPH runs best -> blunder, which is the order
+  // worth reading them in.
+  const marked = (Object.entries(QUALITY_GLYPH) as [MoveQuality, string][]).filter(
+    ([, glyph]) => glyph !== ""
+  );
+  return (
+    <details className="quality-legend">
+      <summary>What do the marks mean?</summary>
+      <dl>
+        {marked.map(([quality, glyph]) => (
+          <div key={quality}>
+            <dt className={`quality ${quality}`}>{glyph}</dt>
+            <dd>{QUALITY_LABEL[quality]}</dd>
+          </div>
+        ))}
+      </dl>
+      <p>
+        No mark means the move was sound - or that it hasn't been analyzed yet.
+        Hover a mark to see how much it gave up.
+      </p>
+    </details>
   );
 }
 
@@ -230,6 +270,9 @@ export function MoveLog({
         </div>
       </div>
 
+      {/* No rows means no marks, so the key would be explaining something that
+          isn't on screen - and the empty state is the one place this panel has
+          nothing to say. */}
       {rows.length === 0 ? (
         <p className="status">No moves yet.</p>
       ) : (
@@ -257,6 +300,8 @@ export function MoveLog({
           ))}
         </ol>
       )}
+
+      {rows.length > 0 ? <QualityLegend /> : null}
     </div>
   );
 }
