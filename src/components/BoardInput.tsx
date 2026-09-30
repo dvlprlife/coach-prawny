@@ -151,7 +151,8 @@ interface BoardInputProps {
   // A whole game at once, from a pasted PGN. Separate from onFenChange because
   // it replaces the move log rather than extending or resetting it - neither of
   // that callback's two behaviours is right for a history arriving complete.
-  onGameLoad: (entries: MoveLogEntry[]) => void;
+  // `description` is describeGame's summary; App shows it above the move log.
+  onGameLoad: (entries: MoveLogEntry[], description: string) => void;
   arrows?: BoardArrow[]; // suggested-move arrows drawn on hover
   lastMove?: { from: Square; to: Square }; // highlighted on the board, independent of hover
 }
@@ -166,13 +167,12 @@ export function BoardInput({
   const [fenText, setFenText] = useState(fen);
   const [fenError, setFenError] = useState<string | null>(null);
   const [recognitionNote, setRecognitionNote] = useState<string | null>(null);
-  // The outcome of the last PGN paste - what loaded, or why it didn't. Held
-  // until something else changes the position (see commitFen), rather than on a
-  // timer: a parse error is worth reading at your own pace, and the confirmation
-  // is the only thing distinguishing "loaded a game" from "the board changed".
-  const [pgnNote, setPgnNote] = useState<{ text: string; error: boolean } | null>(
-    null
-  );
+  // Why the last PGN paste didn't load. Held until something else changes the
+  // position (see commitFen) or a paste succeeds, rather than on a timer: a
+  // parse error is worth reading at your own pace. A successful load is not
+  // reported here - its "Loaded ..." line sits above the move log it describes,
+  // and App owns it (GameState.loaded).
+  const [pgnError, setPgnError] = useState<string | null>(null);
   const [mode, setMode] = useState<EditMode>("play");
   const [orientation, setOrientation] = useState<BoardOrientation>("white");
   const [copied, setCopied] = useState(false);
@@ -443,9 +443,9 @@ export function BoardInput({
       return;
     }
     setFenError(null);
-    // Any deliberate position change retires the last paste's message - it
-    // describes a game that is no longer what's on the board.
-    setPgnNote(null);
+    // Any deliberate position change retires the last paste's error - it is
+    // about a paste that is no longer the latest thing that happened.
+    setPgnError(null);
     // Show what was actually committed, not what was typed. normalizeFen fills
     // in omitted fields and prunes castling rights the placement can't support,
     // so the raw text can otherwise sit there claiming a position we aren't
@@ -703,14 +703,14 @@ export function BoardInput({
   function loadPgnText(text: string) {
     const result = parsePgn(text);
     if (!result.ok) {
-      setPgnNote({ text: result.error, error: true });
+      setPgnError(result.error);
       return;
     }
     const { entries } = result.game;
     setFenError(null);
+    setPgnError(null);
     setFenText(entries[entries.length - 1].fen);
-    setPgnNote({ text: `Loaded ${describeGame(result.game)}.`, error: false });
-    onGameLoad(entries);
+    onGameLoad(entries, describeGame(result.game));
   }
 
   function onPaste(e: ClipboardEvent) {
@@ -1107,9 +1107,7 @@ export function BoardInput({
         or paste a PGN (Ctrl/Cmd+V) anywhere on the page to load a whole game
       </p>
       {fenError && <p className="error">{fenError}</p>}
-      {pgnNote && (
-        <p className={pgnNote.error ? "error" : "note"}>{pgnNote.text}</p>
-      )}
+      {pgnError && <p className="error">{pgnError}</p>}
 
       {/* Hidden until recognizeBoard() is real - see config.recognition.enabled.
           The handlers below it stay wired, so flipping the flag restores this

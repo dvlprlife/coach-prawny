@@ -54,6 +54,14 @@ interface GameState {
   entries: MoveLogEntry[];
   index: number;
   notes: PositionNote[];
+  // describeGame's summary ("Carlsen vs Nakamura - 66 moves"), shown above the
+  // move log while the log is still the pasted game. Lives here rather than in
+  // its own state for the same reason notes do: its lifetime is "until the log
+  // stops being that game", and every event that ends that already writes
+  // GameState.
+  // Replacing or extending the log builds a fresh object, which drops it;
+  // stepping through the log spreads `...g`, which keeps it.
+  loaded?: string;
 }
 
 export default function App() {
@@ -142,6 +150,9 @@ export default function App() {
           // this updater. Notes on the surviving moves keep their indices,
           // which the slice above leaves untouched.
           notes: g.notes.filter((n) => n.index <= g.index),
+          // No `loaded`: any new move - from the end or from part-way back,
+          // dragged or played from a suggestion - means the log is no longer
+          // just the pasted game, so its "Loaded ..." caption goes.
         };
       }
       // Not a continuation: a pasted FEN, a setup edit, a castling or
@@ -165,10 +176,10 @@ export default function App() {
   // a freshly loaded game is unannotated until you step back through it, and the
   // annotations appear as you go. Sweeping the whole game up front would mean
   // running the engine over 40 positions before showing anything.
-  function loadGame(entries: MoveLogEntry[]) {
+  function loadGame(entries: MoveLogEntry[], loaded: string) {
     if (entries.length === 0) return;
     // A different game entirely - same reasoning as the reset above.
-    setGame({ entries, index: entries.length - 1, notes: [] });
+    setGame({ entries, index: entries.length - 1, notes: [], loaded });
   }
 
   // Clicking a suggested move plays it, exactly as though it had been dragged:
@@ -435,6 +446,7 @@ export default function App() {
             <MoveLog
               entries={game.entries}
               currentIndex={game.index}
+              caption={game.loaded}
               onBack={goBack}
               onForward={goForward}
               onFirst={goToStart}

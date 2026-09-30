@@ -45,8 +45,10 @@ export function About({ onClose, backHref }: AboutProps) {
           into anything first - to load a whole game. The move log fills with
           the full game and the board lands on the final position, so you can
           step back through it with <strong>‹ ›</strong> or the{" "}
-          <strong>← →</strong> keys. Comments, annotations and alternative
-          variations are ignored, and a game that didn't begin from the starting
+          <strong>← →</strong> keys. The players and length show above the move
+          log until you play a move of your own or set up a new position.
+          Comments, annotations and alternative variations are ignored, and a
+          game that didn't begin from the starting
           position loads from wherever it did. Pasting a FEN is unaffected - it
           still goes in the box below.
         </li>
