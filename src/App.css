@@ -543,6 +543,13 @@ a.action-btn {
 
 /* ---- right: move log (played-move history + back/forward) ---- */
 .move-log { margin-top: 24px; }
+/* The "Loaded ..." line from a pasted PGN - the .note look, sitting above the
+   header of the log it describes. */
+.move-log-caption {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 8px;
+}
 .move-log-header {
   display: flex;
   align-items: center;

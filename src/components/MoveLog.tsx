@@ -17,6 +17,9 @@ import type { MoveLogEntry } from "../config/types";
 interface MoveLogProps {
   entries: MoveLogEntry[];
   currentIndex: number;
+  // What a pasted PGN loaded ("Carlsen vs Nakamura - 66 moves"), while the log
+  // is still that game. Undefined otherwise.
+  caption?: string;
   onBack: () => void;
   onForward: () => void;
   onFirst: () => void;
@@ -189,6 +192,7 @@ function useScrollCurrentIntoView(
 export function MoveLog({
   entries,
   currentIndex,
+  caption,
   onBack,
   onForward,
   onFirst,
@@ -213,6 +217,11 @@ export function MoveLog({
 
   return (
     <div className="move-log">
+      {/* Only over a log with moves in it: a headers-only PGN would otherwise
+          put "Loaded position only." directly above "No moves yet." */}
+      {caption && rows.length > 0 ? (
+        <p className="move-log-caption">Loaded {caption}.</p>
+      ) : null}
       <div className="move-log-header">
         <h2>Moves</h2>
         <div className="move-log-actions">
