@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isScored, recordEval } from "./recordEval";
+import { isCompleteResult, isScored, recordEval } from "./recordEval";
 import type { AnalysisResult, EngineMove, MoveLogEntry } from "../config/types";
 
 const A = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -58,5 +58,45 @@ describe("isScored", () => {
     expect(isScored({ fen: A, evalCp: null, mateIn: null })).toBe(false);
     expect(isScored({ fen: A, evalCp: 0 })).toBe(true);
     expect(isScored({ fen: A, evalCp: null, mateIn: 2 })).toBe(true);
+  });
+});
+
+describe("isCompleteResult", () => {
+  // A (White to move), B (Black to move). Scores are on White's scale, as
+  // analyzeEngine delivers them.
+  const at = (depth: number, l: EngineMove): EngineMove => ({ ...l, depth });
+
+  it("accepts a rank-1 line at the requested depth", () => {
+    expect(isCompleteResult(result(A, [at(18, line(1, "e2e4", 30))]), 18)).toBe(true);
+    expect(isCompleteResult(result(A, [at(20, line(1, "e2e4", 30))]), 18)).toBe(true);
+  });
+
+  it("rejects a shallow result", () => {
+    expect(isCompleteResult(result(A, [at(15, line(1, "e2e4", 30))]), 18)).toBe(false);
+  });
+
+  it("accepts a shallow mate in one for the side to move - it is exact", () => {
+    expect(isCompleteResult(result(A, [at(15, line(1, "d1d8", null, 1))]), 18)).toBe(true);
+    // Black mating in one is -1 on White's scale.
+    expect(isCompleteResult(result(B, [at(1, line(1, "d8h4", null, -1))]), 18)).toBe(true);
+  });
+
+  it("does not accept a shallow mate the side to move is on the wrong end of", () => {
+    // White to move and mated next move: not the capped case.
+    expect(isCompleteResult(result(A, [at(15, line(1, "h2h3", null, -1))]), 18)).toBe(false);
+    expect(isCompleteResult(result(B, [at(15, line(1, "h7h6", null, 1))]), 18)).toBe(false);
+  });
+
+  it("does not accept a shallow longer mate", () => {
+    expect(isCompleteResult(result(A, [at(15, line(1, "b3b8", null, 2))]), 18)).toBe(false);
+  });
+
+  it("judges by rank 1, whatever order the lines arrive in", () => {
+    const res = result(A, [at(18, line(2, "c1b1", -1100)), at(15, line(1, "d1d8", null, 1))]);
+    expect(isCompleteResult(res, 18)).toBe(true);
+  });
+
+  it("rejects a result with no lines", () => {
+    expect(isCompleteResult(result(A, []), 18)).toBe(false);
   });
 });

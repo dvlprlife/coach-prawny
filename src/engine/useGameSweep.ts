@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { analyze } from "./analyzeEngine";
 import { SearchPreempted } from "./stockfishWorker";
-import { isScored } from "./recordEval";
+import { isCompleteResult, isScored } from "./recordEval";
 import { config } from "../config/config";
 import type { AnalysisResult, MoveLogEntry } from "../config/types";
 
@@ -105,11 +105,13 @@ export function useGameSweep({
             });
             if (!live()) return;
             // A checkmate or stalemate has no lines, so nothing to record.
-            // A line short of full depth is never recorded either - a
-            // background search that finishes ends at `go depth`, so this is
-            // a backstop, and stepping to the move still scores it normally.
-            const best = res.moves.find((m) => m.rank === 1);
-            if (best && best.depth >= depth) onRecordRef.current(index, res);
+            // A line short of full depth isn't recorded either, with one
+            // expected exception: the engine caps a mate-in-one search after a
+            // grace period, and that result is exact however shallow it is
+            // (isCompleteResult). For anything else this is a backstop - a
+            // background search that finishes ends at `go depth` - and stepping
+            // to the move still scores it normally.
+            if (isCompleteResult(res, depth)) onRecordRef.current(index, res);
             break;
           } catch (e) {
             if (!live()) return;

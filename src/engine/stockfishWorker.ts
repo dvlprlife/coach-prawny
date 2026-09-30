@@ -28,6 +28,20 @@ const READY_TIMEOUT_MS = 15_000;
 // search that never resolves would block every search queued behind it.)
 const SEARCH_SILENCE_TIMEOUT_MS = 10_000;
 
+// How long a search may run once the side to move has a mate in one (#65).
+// Rank 1 is `mate 1` and the mating move from depth 1 onward, and nothing
+// deeper can change it - but at MultiPV 3 the engine still searches the two
+// hopeless alternatives to full depth. That is usually quick, yet in some
+// positions it explodes: Stockfish 19 took 12-16s on one Opera Game mate-in-1
+// whose line 2 doubles in cost per depth (d15 at 2s, d18 at ~12s).
+//
+// A latency knob, not a correctness one. Only rank 1 is ever recorded, and it
+// is final from the first depth, so stopping early cannot change a mark
+// whenever it fires. On slower hardware it will sometimes cut an ordinary
+// mate-in-1 short too; all that changes is which alternatives the Best-moves
+// panel lists under the mate.
+const MATE_IN_ONE_GRACE_MS = 2_000;
+
 // How a background search ends when a foreground one needs the engine: queued,
 // it is dropped before it ever runs; running, it is stopped and REJECTS rather
 // than resolving with the partial lines a stopped search returns. The caller
@@ -192,6 +206,7 @@ export class StockfishEngine {
     return new Promise((resolve, reject) => {
       const lines = new Map<number, EngineMove>();
       let silence: ReturnType<typeof setTimeout>;
+      let mateGrace: ReturnType<typeof setTimeout> | undefined;
 
       // Restarted on every line the engine sends, so the timer measures how long
       // it has been quiet rather than how long the search has run.
@@ -223,7 +238,10 @@ export class StockfishEngine {
           // A pre-empted search whose `bestmove` crossed our `stop` in flight
           // may already have finished at full depth. That result is complete,
           // so keep it rather than make the sweep search the position again.
-          if (job.preempted && (ranked[0]?.depth ?? 0) < depth) {
+          // So is a mate in one at any depth (see MATE_IN_ONE_GRACE_MS) - the
+          // sweep's isCompleteResult accepts it on the same grounds.
+          const complete = (ranked[0]?.depth ?? 0) >= depth || ranked[0]?.mateIn === 1;
+          if (job.preempted && !complete) {
             reject(new SearchPreempted());
           } else {
             resolve(ranked.slice(0, multiPv));
@@ -241,6 +259,7 @@ export class StockfishEngine {
 
       const cleanup = () => {
         clearTimeout(silence);
+        clearTimeout(mateGrace);
         this.worker.removeEventListener("message", handler);
         const i = this.pendingRejects.indexOf(onFailure);
         if (i !== -1) this.pendingRejects.splice(i, 1);
@@ -254,6 +273,13 @@ export class StockfishEngine {
       this.send(`position fen ${fen}`);
       this.send(`go depth ${depth}`);
       heardFromEngine();
+      // Anchored to the start of the search, and checked only when it fires:
+      // a mate in one that has finished by then never sees it. `mateIn` is
+      // still raw UCI here - from the side to move's view - so +1 is the mover
+      // mating, for either colour.
+      mateGrace = setTimeout(() => {
+        if (lines.get(1)?.mateIn === 1) this.stop();
+      }, MATE_IN_ONE_GRACE_MS);
     });
   }
 
