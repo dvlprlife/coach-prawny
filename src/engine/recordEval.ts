@@ -2,12 +2,26 @@
 // by the live analysis (App's onResult) and the whole-game sweep
 // (useGameSweep), so the two can't drift into scoring moves differently.
 
+import { getSideToMove } from "./fen";
 import type { AnalysisResult, MoveLogEntry } from "../config/types";
 
 // A position counts as scored once its evaluation has been recorded. Either
 // field will do: a forced mate has mateIn and a null evalCp.
 export function isScored(entry: MoveLogEntry): boolean {
   return entry.evalCp != null || entry.mateIn != null;
+}
+
+// Whether a finished search can be recorded as the position's score: its
+// rank-1 line reached the requested depth, OR the side to move mates in one.
+// The second is the one shallow result expected - the engine caps a mate-in-one
+// search after a grace period (MATE_IN_ONE_GRACE_MS) - and it is still exact:
+// `mate 1` and the mating move are final from the first depth. Scores here are
+// already on White's scale (analyzeEngine), so Black mating in one is -1.
+export function isCompleteResult(result: AnalysisResult, depth: number): boolean {
+  const best = result.moves.find((m) => m.rank === 1);
+  if (!best) return false;
+  if (best.depth >= depth) return true;
+  return best.mateIn === (getSideToMove(result.fen) === "w" ? 1 : -1);
 }
 
 // Returns a new entries array with `result`'s rank-1 line recorded on

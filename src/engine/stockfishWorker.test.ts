@@ -247,3 +247,113 @@ describe("StockfishEngine scheduling", () => {
     expect(queued.error).toBeInstanceOf(Error);
   });
 });
+
+// #65: with the mover mating in one, the engine stops the search after a grace
+// period instead of taking the hopeless alternatives to full depth.
+describe("StockfishEngine mate-in-one cap", () => {
+  const GRACE = 2_000;
+  const mateLine = (depth: number) =>
+    `info depth ${depth} multipv 1 score mate 1 pv d1d8`;
+
+  it("stops a mate-in-one search after the grace period, and it resolves", async () => {
+    const search = track(engine.analyze(FEN, 3, 18));
+    await flush();
+    worker.emit(mateLine(1));
+    worker.emit("info depth 12 multipv 2 score cp -900 pv c1b1");
+    vi.advanceTimersByTime(GRACE - 1);
+    expect(worker.count("stop")).toBe(0);
+    vi.advanceTimersByTime(1);
+    expect(worker.count("stop")).toBe(1);
+
+    worker.emit(mateLine(15));
+    worker.emit("bestmove d1d8");
+    await flush();
+    expect(search.error).toBeUndefined();
+    expect(search.value?.map((m) => [m.rank, m.depth, m.mateIn])).toEqual([
+      [1, 15, 1],
+      [2, 12, null],
+    ]);
+  });
+
+  it("measures the grace period from the start of the search, not from the mate", async () => {
+    engine.analyze(FEN, 3, 18);
+    await flush();
+    vi.advanceTimersByTime(1_500);
+    worker.emit(mateLine(9));
+    vi.advanceTimersByTime(GRACE - 1_500);
+    expect(worker.count("stop")).toBe(1);
+  });
+
+  it("leaves a mate-in-one that finishes inside the grace period alone", async () => {
+    const search = track(engine.analyze(FEN, 3, 18));
+    await flush();
+    worker.emit(mateLine(18));
+    worker.emit("bestmove d1d8");
+    await flush();
+    vi.advanceTimersByTime(GRACE * 2);
+    expect(worker.count("stop")).toBe(0);
+    expect(search.value?.[0].depth).toBe(18);
+  });
+
+  it("does not cap a search without a mate", async () => {
+    engine.analyze(FEN, 3, 18);
+    await flush();
+    worker.emit("info depth 14 multipv 1 score cp 35 pv e2e4");
+    vi.advanceTimersByTime(GRACE * 2);
+    expect(worker.count("stop")).toBe(0);
+  });
+
+  it("does not cap a search where the side to move is the one being mated", async () => {
+    engine.analyze(FEN, 3, 18);
+    await flush();
+    worker.emit("info depth 10 multipv 1 score mate -1 pv h2h3");
+    vi.advanceTimersByTime(GRACE * 2);
+    expect(worker.count("stop")).toBe(0);
+  });
+
+  it("resolves a capped background search rather than treating it as pre-empted", async () => {
+    const bg = track(engine.analyze(FEN, 3, 18, { background: true }));
+    await flush();
+    worker.emit(mateLine(3));
+    vi.advanceTimersByTime(GRACE);
+    expect(worker.count("stop")).toBe(1);
+    worker.emit(mateLine(15));
+    worker.emit("bestmove d1d8");
+    await flush();
+    expect(bg.error).toBeUndefined();
+    expect(bg.value?.[0].mateIn).toBe(1);
+  });
+
+  it("keeps a shallow mate in one even when a live search pre-empts it", async () => {
+    // The sweep would otherwise re-search an exact result for another grace
+    // period every time the user steps while it is running.
+    const bg = track(engine.analyze(FEN, 3, 18, { background: true }));
+    await flush();
+    worker.emit(mateLine(6));
+    engine.analyze(FEN, 3, 18);
+    worker.emit("bestmove d1d8");
+    await flush();
+    expect(bg.error).toBeUndefined();
+    expect(bg.value?.[0]).toMatchObject({ mateIn: 1, depth: 6 });
+  });
+
+  it("still rejects a shallow pre-empted background search without a mate", async () => {
+    const bg = track(engine.analyze(FEN, 3, 18, { background: true }));
+    await flush();
+    worker.emit("info depth 6 multipv 1 score cp 400 pv d1d8");
+    engine.analyze(FEN, 3, 18);
+    worker.emit("bestmove d1d8");
+    await flush();
+    expect(bg.error).toBeInstanceOf(SearchPreempted);
+  });
+
+  it("sends nothing to an engine that died during the grace period", async () => {
+    engine.analyze(FEN, 3, 18).catch(() => {});
+    await flush();
+    worker.emit(mateLine(4));
+    worker.onerror?.({ message: "boom" } as ErrorEvent);
+    await flush();
+    vi.advanceTimersByTime(GRACE * 2);
+    expect(worker.count("stop")).toBe(0);
+  });
+});
