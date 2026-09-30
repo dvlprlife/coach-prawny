@@ -19,6 +19,10 @@ export type MoveQuality = "best" | "good" | "inaccuracy" | "mistake" | "blunder"
 export interface MoveAssessment {
   quality: MoveQuality;
   lossCp: number; // centipawns given up, from the mover's point of view
+  // Set when a costly move was graded "good" only because the game was already
+  // won or lost (see alreadyDecided). The loss is real, so it is kept - this
+  // is what lets the tooltip explain why a move that gave up 6.00 gets a ✓.
+  decided?: true;
 }
 
 // Mate collapsed onto the centipawn scale so a mate score and a normal score
@@ -75,9 +79,21 @@ export function assessMove(params: {
   // In an already-won or already-lost position, don't cry blunder over a
   // margin that changes nothing.
   if (quality !== "good" && alreadyDecided(scoreBefore, scoreAfter, mover)) {
-    return { quality: "good", lossCp };
+    return { quality: "good", lossCp, decided: true };
   }
   return { quality, lossCp };
+}
+
+// The hover text for a mark. "Mistake - gave up 1.30" reads better than a bare
+// centipawn count, and the pawn unit matches how the evaluations are shown in
+// the Best-moves panel. A move let off because the game was already decided
+// says so - otherwise its ✓ sits over "gave up 6.00" and reads as a
+// contradiction.
+export function describeAssessment(assessment: MoveAssessment): string {
+  const label = QUALITY_LABEL[assessment.quality];
+  if (assessment.lossCp <= 0) return label;
+  const loss = `${label} - gave up ${(assessment.lossCp / 100).toFixed(2)}`;
+  return assessment.decided ? `${loss}, but the game was already decided` : loss;
 }
 
 // Convenience wrapper over two adjacent move-log entries: `played` is the entry

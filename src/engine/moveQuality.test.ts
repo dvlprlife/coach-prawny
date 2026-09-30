@@ -9,6 +9,7 @@ import {
   toScore,
   assessMove,
   assessEntry,
+  describeAssessment,
   QUALITY_GLYPH,
   QUALITY_LABEL,
   type MoveQuality,
@@ -121,6 +122,14 @@ describe("assessMove — already-decided positions", () => {
     const a = assessMove({ scoreBefore: 2000, scoreAfter: 1400, mover: "w" });
     expect(a!.quality).toBe("good");
     expect(a!.lossCp).toBe(600);
+    expect(a!.decided).toBe(true);
+  });
+
+  it("does not mark an ordinary good move as let off", () => {
+    // Winning big, but the move cost too little to be flagged anyway - it is
+    // good on its own merits, not because the game was decided.
+    const a = assessMove({ scoreBefore: 2000, scoreAfter: 1970, mover: "w" });
+    expect(a).toEqual({ quality: "good", lossCp: 30 });
   });
 
   it("does not call it a blunder when the game was already lost and still is", () => {
@@ -160,6 +169,29 @@ describe("assessMove — already-decided positions", () => {
       mover: "b",
     });
     expect(a!.quality).toBe("blunder");
+  });
+});
+
+describe("describeAssessment", () => {
+  it("names the verdict alone when nothing was given up", () => {
+    expect(describeAssessment({ quality: "best", lossCp: 0 })).toBe("Best move");
+    expect(describeAssessment({ quality: "best", lossCp: -15 })).toBe("Best move");
+  });
+
+  it("gives the loss in pawns", () => {
+    expect(describeAssessment({ quality: "mistake", lossCp: 130 })).toBe(
+      "Mistake - gave up 1.30"
+    );
+    expect(describeAssessment({ quality: "good", lossCp: 30 })).toBe(
+      "Good move - gave up 0.30"
+    );
+  });
+
+  it("explains a costly move let off because the game was already decided", () => {
+    const a = assessMove({ scoreBefore: 2000, scoreAfter: 1400, mover: "w" });
+    expect(describeAssessment(a!)).toBe(
+      "Good move - gave up 6.00, but the game was already decided"
+    );
   });
 });
 

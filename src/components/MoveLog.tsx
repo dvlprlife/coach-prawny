@@ -7,6 +7,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { getSideToMove, STARTING_FEN } from "../engine/fen";
 import {
   assessEntry,
+  describeAssessment,
   QUALITY_GLYPH,
   QUALITY_LABEL,
   type MoveAssessment,
@@ -78,14 +79,6 @@ function buildRows(entries: MoveLogEntry[]): LogRow[] {
   return rows;
 }
 
-// "Mistake - gave up 1.30" reads better than a bare centipawn count, and the
-// pawn unit matches how the evaluations are shown in the Best-moves panel.
-function assessmentTitle(assessment: MoveAssessment): string {
-  const label = QUALITY_LABEL[assessment.quality];
-  if (assessment.lossCp <= 0) return label;
-  return `${label} - gave up ${(assessment.lossCp / 100).toFixed(2)}`;
-}
-
 // The annotation shown after a move. Every verdict has a glyph, so nothing is
 // rendered only for a move that hasn't been assessed yet.
 function Annotation({ assessment }: { assessment: MoveAssessment | null }) {
@@ -93,7 +86,7 @@ function Annotation({ assessment }: { assessment: MoveAssessment | null }) {
   const glyph = QUALITY_GLYPH[assessment.quality];
   if (!glyph) return null;
   return (
-    <span className={`quality ${assessment.quality}`} title={assessmentTitle(assessment)}>
+    <span className={`quality ${assessment.quality}`} title={describeAssessment(assessment)}>
       {glyph}
     </span>
   );
