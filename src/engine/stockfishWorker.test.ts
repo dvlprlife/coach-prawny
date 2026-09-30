@@ -147,6 +147,72 @@ describe("StockfishEngine scheduling", () => {
     expect(live.value?.[0].depth).toBe(18);
   });
 
+  it("keeps a pre-empted background search that had already reached full depth", async () => {
+    const bg = track(engine.analyze(FEN, 1, 18, { background: true }));
+    await flush();
+    engine.analyze(FEN, 1, 18);
+    await flush();
+    // The search finished before our `stop` reached it: its bestmove carries a
+    // full-depth line, which is a complete result.
+    worker.finish(18);
+    await flush();
+    expect(bg.error).toBeUndefined();
+    expect(bg.value?.[0].depth).toBe(18);
+  });
+
+  it("holds every new search while a pre-empted background winds down", async () => {
+    // The sweep's steady state while the user steps through the game: its
+    // search is stopped, it retries at once, and more live requests arrive -
+    // all before the stopped search has answered.
+    const bg = track(engine.analyze(FEN, 1, 18, { background: true }));
+    await flush();
+    const live1 = track(engine.analyze(FEN, 1, 18));
+    const retry = track(engine.analyze(FEN, 1, 18, { background: true }));
+    const live2 = track(engine.analyze(FEN, 1, 18));
+    await flush();
+
+    // Nothing new reaches the worker until the stopped search's bestmove.
+    expect(worker.count("go")).toBe(1);
+    // The retry queued behind live1 is dropped by live2, and never sent a stop.
+    expect(retry.error).toBeInstanceOf(SearchPreempted);
+    expect(worker.count("stop")).toBe(2);
+
+    worker.finish(6);
+    await flush();
+    expect(bg.error).toBeInstanceOf(SearchPreempted);
+    expect(worker.count("go")).toBe(2);
+
+    worker.finish();
+    await flush();
+    expect(live1.value?.[0].depth).toBe(18);
+    expect(worker.count("go")).toBe(3);
+    worker.finish();
+    await flush();
+    expect(live2.value?.[0].depth).toBe(18);
+  });
+
+  it("runs a background retry only after the foreground search that pre-empted it", async () => {
+    const bg = engine.analyze(FEN, 1, 18, { background: true });
+    await flush();
+    const live = track(engine.analyze(FEN, 1, 18));
+    worker.finish(4);
+    await expect(bg).rejects.toBeInstanceOf(SearchPreempted);
+
+    // What the sweep does next: ask again, as a background search.
+    const retry = track(engine.analyze(FEN, 1, 18, { background: true }));
+    await flush();
+    expect(worker.count("stop")).toBe(1);
+    expect(worker.count("go")).toBe(2);
+
+    worker.finish();
+    await flush();
+    expect(live.value?.[0].depth).toBe(18);
+    expect(worker.count("go")).toBe(3);
+    worker.finish();
+    await flush();
+    expect(retry.value?.[0].depth).toBe(18);
+  });
+
   it("still resolves a foreground search stopped by another with its partial lines", async () => {
     const first = track(engine.analyze(FEN, 1, 18));
     engine.analyze(FEN, 1, 18);

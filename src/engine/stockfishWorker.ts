@@ -119,7 +119,7 @@ export class StockfishEngine {
       clearTimeout(this.readyTimer);
       this.resolveReady();
     }
-    // Analysis lines are handled per-request in analyze() via a temporary listener.
+    // Analysis lines are handled per-search in runSearch() via a temporary listener.
   }
 
   // Mark the engine permanently dead and fail everything waiting on it. Only the
@@ -219,10 +219,13 @@ export class StockfishEngine {
         if (text.startsWith("bestmove")) {
           cleanup();
           this.running = null;
-          if (job.preempted) {
+          const ranked = [...lines.values()].sort((a, b) => a.rank - b.rank);
+          // A pre-empted search whose `bestmove` crossed our `stop` in flight
+          // may already have finished at full depth. That result is complete,
+          // so keep it rather than make the sweep search the position again.
+          if (job.preempted && (ranked[0]?.depth ?? 0) < depth) {
             reject(new SearchPreempted());
           } else {
-            const ranked = [...lines.values()].sort((a, b) => a.rank - b.rank);
             resolve(ranked.slice(0, multiPv));
           }
           this.startNext();
