@@ -82,6 +82,7 @@ body {
 /* Match the move-log annotation colours so the About key reads as the legend
    it is, rather than as generic bold text. */
 .about .q-best { color: var(--sage); }
+.about .q-good { color: var(--sage); }
 .about .q-inaccuracy { color: var(--prawn-flat); }
 .about .q-mistake { color: var(--prawn); }
 .about .q-blunder { color: var(--threat); }
@@ -601,11 +602,10 @@ a.action-btn {
   font-weight: 600;
 }
 
-/* Move-quality annotations. Only the notable qualities carry a glyph at all
-   (QUALITY_GLYPH leaves "good" blank), so these read as exceptions rather than
-   decoration on every move. The colours run the same direction as the verdict:
-   sage for the good news, through prawn, to the same red used for threats
-   elsewhere on the board. */
+/* Move-quality annotations. Every analyzed move carries one, so a bare move
+   means "not analyzed yet". The colours run the same direction as the verdict:
+   sage for the good news (★ and ✓ share it - shape carries the difference),
+   through prawn, to the same red used for threats elsewhere on the board. */
 .move-log-row .quality {
   margin-left: 3px;
   font-weight: 700;
@@ -615,6 +615,7 @@ a.action-btn {
    reuses these same classes, and a key whose marks didn't match the marks in
    the list would be worse than no key at all. */
 .quality.best { color: var(--sage); }
+.quality.good { color: var(--sage); }
 .quality.inaccuracy { color: var(--prawn-flat); }
 .quality.mistake { color: var(--prawn); }
 .quality.blunder { color: var(--threat); }

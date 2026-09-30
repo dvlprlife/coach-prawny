@@ -124,11 +124,12 @@ function hasForcedMate(score: number, mover: "w" | "b"): boolean {
   return mover === "w" ? score >= MATE_FLOOR : score <= -MATE_FLOOR;
 }
 
-// Shown after the move in the log. "good" is deliberately blank - an annotation
-// on every move would be noise, and the interesting ones are the mistakes.
+// Shown after the move in the log. Every verdict has a mark, so a move with no
+// mark means only one thing: it hasn't been analyzed yet. A blank "good" used
+// to make a sound move and an unjudged one look identical.
 export const QUALITY_GLYPH: Record<MoveQuality, string> = {
   best: "★",
-  good: "",
+  good: "✓",
   inaccuracy: "?!",
   mistake: "?",
   blunder: "??",

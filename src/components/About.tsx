@@ -138,10 +138,11 @@ export function About({ onClose, backHref }: AboutProps) {
       <ul>
         <li>
           <strong className="q-best">★</strong> the engine's own top choice, or
-          as good as; <strong className="q-inaccuracy">?!</strong> an
-          inaccuracy; <strong className="q-mistake">?</strong> a mistake;{" "}
-          <strong className="q-blunder">??</strong> a blunder. Ordinary sound
-          moves are left unmarked.
+          as good as; <strong className="q-good">✓</strong> a sound move;{" "}
+          <strong className="q-inaccuracy">?!</strong> an inaccuracy;{" "}
+          <strong className="q-mistake">?</strong> a mistake;{" "}
+          <strong className="q-blunder">??</strong> a blunder. A move with no
+          mark hasn't been analyzed yet.
         </li>
         <li>
           A move is only judged once both the position before it and the
