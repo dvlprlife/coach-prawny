@@ -28,6 +28,36 @@ const READY_TIMEOUT_MS = 15_000;
 // search that never resolves would block every search queued behind it.)
 const SEARCH_SILENCE_TIMEOUT_MS = 10_000;
 
+// How a background search ends when a foreground one needs the engine: queued,
+// it is dropped before it ever runs; running, it is stopped and REJECTS rather
+// than resolving with the partial lines a stopped search returns. The caller
+// (the whole-game sweep) retries it later - it must never mistake a cut-short
+// search for a complete one.
+export class SearchPreempted extends Error {
+  constructor() {
+    super("Background search pre-empted by a foreground search.");
+    this.name = "SearchPreempted";
+  }
+}
+
+export interface AnalyzeOptions {
+  // Runs only when nothing else wants the engine: it never stops the running
+  // search, and any foreground request pre-empts it (see SearchPreempted).
+  background?: boolean;
+}
+
+interface Job {
+  fen: string;
+  multiPv: number;
+  depth: number;
+  background: boolean;
+  // Set on a RUNNING background job when a foreground request stops it, so its
+  // `bestmove` rejects instead of resolving.
+  preempted: boolean;
+  resolve: (moves: EngineMove[]) => void;
+  reject: Rejecter;
+}
+
 export class StockfishEngine {
   private worker: Worker;
   private ready: Promise<void>;
@@ -42,11 +72,16 @@ export class StockfishEngine {
   private pendingRejects: Rejecter[] = [];
   // Stockfish runs one search at a time over a single UCI session, so a
   // `bestmove` reply can't be attributed to a specific caller if two searches
-  // overlap. Every analyze() call queues behind the previous one's result;
-  // a search still in flight is stopped immediately so it wraps up with
-  // whatever it has instead of running to full depth before the queue moves.
-  private queue: Promise<unknown> = Promise.resolve();
-  private searching = false;
+  // overlap. Jobs wait in `queue` and the next one starts only once the running
+  // one's `bestmove` has arrived. A foreground request stops the running search
+  // so it wraps up with whatever it has instead of running to full depth first.
+  //
+  // An explicit list rather than a promise chain because background jobs need
+  // to be reached while they are still waiting: stop() only touches the search
+  // that is running, so a chained background search would hold up the live
+  // one for a full search.
+  private queue: Job[] = [];
+  private running: Job | null = null;
 
   constructor(workerUrl: string) {
     // The stockfish WASM build ships a worker script. In Vite you can import the
@@ -93,9 +128,12 @@ export class StockfishEngine {
     if (this.failure) return;
     this.failure = error;
     clearTimeout(this.readyTimer);
-    this.searching = false;
+    this.running = null;
     this.rejectReady(error);
+    // The running search is reached through pendingRejects; queued jobs never
+    // registered there, so they are failed directly.
     for (const reject of this.pendingRejects.splice(0)) reject(error);
+    for (const job of this.queue.splice(0)) job.reject(error);
   }
 
   // Once dead, always dead - the caller should throw this engine away and build
@@ -112,18 +150,45 @@ export class StockfishEngine {
   // Run a MultiPV analysis. Returns ranked moves once the search reaches the
   // target depth. Promise-shaped on purpose so a server swap is a drop-in.
   // Queued behind any in-flight search - see the `queue` field above.
-  analyze(fen: string, multiPv: number, depth: number): Promise<EngineMove[]> {
+  analyze(
+    fen: string,
+    multiPv: number,
+    depth: number,
+    { background = false }: AnalyzeOptions = {}
+  ): Promise<EngineMove[]> {
     if (this.failure) return Promise.reject(this.failure);
-    if (this.searching) this.stop();
-    const result = this.queue.then(() => this.runSearch(fen, multiPv, depth));
-    this.queue = result.catch(() => undefined);
-    return result;
+    return new Promise((resolve, reject) => {
+      if (!background) {
+        // Drop every waiting background job before it reaches the worker, so the
+        // live search never queues behind one.
+        this.queue = this.queue.filter((job) => {
+          if (!job.background) return true;
+          job.reject(new SearchPreempted());
+          return false;
+        });
+        if (this.running) {
+          if (this.running.background) this.running.preempted = true;
+          this.stop();
+        }
+      }
+      this.queue.push({ fen, multiPv, depth, background, preempted: false, resolve, reject });
+      this.startNext();
+    });
   }
 
-  private runSearch(fen: string, multiPv: number, depth: number): Promise<EngineMove[]> {
-    // The engine may have died while this call sat in the queue.
-    if (this.failure) return Promise.reject(this.failure);
-    this.searching = true;
+  // Starts the next queued job if the engine is idle. Called when a job is
+  // queued and again from each `bestmove`, which is the only point at which the
+  // worker has finished with the previous search.
+  private startNext() {
+    if (this.running || this.failure) return;
+    const job = this.queue.shift();
+    if (!job) return;
+    this.running = job;
+    this.runSearch(job).then(job.resolve, job.reject);
+  }
+
+  private runSearch(job: Job): Promise<EngineMove[]> {
+    const { fen, multiPv, depth } = job;
     return new Promise((resolve, reject) => {
       const lines = new Map<number, EngineMove>();
       let silence: ReturnType<typeof setTimeout>;
@@ -153,9 +218,14 @@ export class StockfishEngine {
         // requested depth, or it was cut short by stop()).
         if (text.startsWith("bestmove")) {
           cleanup();
-          this.searching = false;
-          const ranked = [...lines.values()].sort((a, b) => a.rank - b.rank);
-          resolve(ranked.slice(0, multiPv));
+          this.running = null;
+          if (job.preempted) {
+            reject(new SearchPreempted());
+          } else {
+            const ranked = [...lines.values()].sort((a, b) => a.rank - b.rank);
+            resolve(ranked.slice(0, multiPv));
+          }
+          this.startNext();
         }
       };
 

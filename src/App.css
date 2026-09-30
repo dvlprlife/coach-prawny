@@ -550,14 +550,20 @@ a.action-btn {
   font-size: 13px;
   margin: 0 0 8px;
 }
+/* Both rows wrap: with Analyze game, Copy PGN and the four nav buttons the
+   actions alone are ~290px, which on a phone no longer fits beside the heading
+   and pushed the page into a sideways scroll. They drop below "Moves" instead. */
 .move-log-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 12px;
 }
 .move-log-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
 }
