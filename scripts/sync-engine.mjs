@@ -22,8 +22,8 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const FILES = [
-  "stockfish-18-lite-single.js",
-  "stockfish-18-lite-single.wasm",
+  "stockfish-19-lite-single.js",
+  "stockfish-19-lite-single.wasm",
 ];
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
