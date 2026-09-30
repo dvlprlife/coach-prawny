@@ -12,8 +12,8 @@ import { Chess } from "chess.js";
 //
 // "-lite-single" = single-threaded + smaller NNUE net. Single-threaded means it
 // runs WITHOUT the COOP/COEP headers, the safest default. For more speed, copy
-// "stockfish-18-lite.js" (+ .wasm) instead and confirm your headers are live.
-const stockfishUrl = "/engine/stockfish-18-lite-single.js";
+// "stockfish-19-lite.js" (+ .wasm) instead and confirm your headers are live.
+const stockfishUrl = "/engine/stockfish-19-lite-single.js";
 import { BoardInput, type BoardArrow, type Square } from "./components/BoardInput";
 import { MoveList } from "./components/MoveList";
 import { MoveLog } from "./components/MoveLog";

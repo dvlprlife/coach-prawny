@@ -73,8 +73,8 @@ jobs:
       - name: Verify Stockfish engine assets shipped
         shell: bash
         run: |
-          for f in dist/engine/stockfish-18-lite-single.js \
-                   dist/engine/stockfish-18-lite-single.wasm; do
+          for f in dist/engine/stockfish-19-lite-single.js \
+                   dist/engine/stockfish-19-lite-single.wasm; do
             if [ ! -s "$f" ]; then
               echo "missing or empty: $f"
               exit 1
