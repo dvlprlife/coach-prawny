@@ -155,8 +155,11 @@ export function About({ onClose, backHref }: AboutProps) {
         <li>
           The same goes for a game you've just <strong>pasted in</strong>: none
           of its positions have been looked at yet, so it arrives with no
-          annotations at all. Walking back through the moves scores them one by
-          one, and the marks appear behind you as you go.
+          annotations at all. Press <strong>Analyze game</strong> above the
+          move list to score every move at once - the marks fill in as it goes,
+          you can keep stepping through the game while it runs, and{" "}
+          <strong>Stop</strong> ends it early. Walking back through the moves
+          scores them too, one by one.
         </li>
         <li>
           Once a game is completely won or lost, further imprecision is not

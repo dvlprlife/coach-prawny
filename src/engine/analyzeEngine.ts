@@ -11,7 +11,7 @@ import { Chess } from "chess.js";
 import { config } from "../config/config";
 import type { AnalysisResult, EngineMove, Fen } from "../config/types";
 import { getSideToMove } from "./fen";
-import { StockfishEngine } from "./stockfishWorker";
+import { StockfishEngine, type AnalyzeOptions } from "./stockfishWorker";
 
 // The in-flight-or-settled init, not the engine itself: callers await the same
 // promise, so a second analyze() during startup can't grab a half-initialized
@@ -54,7 +54,10 @@ export async function analyze(
   fen: Fen,
   workerUrl: string,
   multiPv: number = config.engine.multiPv,
-  depth: number = config.engine.depth
+  depth: number = config.engine.depth,
+  // Only meaningful for the client engine, which has one worker to share. A
+  // server takes each request on its own, so there is nothing to prioritize.
+  opts: AnalyzeOptions = {}
 ): Promise<AnalysisResult> {
   let moves: EngineMove[];
   if (config.engine.mode === "server") {
@@ -62,8 +65,10 @@ export async function analyze(
   } else {
     const engine = await getClientEngine(workerUrl);
     try {
-      moves = await engine.analyze(fen, multiPv, depth);
+      moves = await engine.analyze(fen, multiPv, depth, opts);
     } catch (error) {
+      // A SearchPreempted passes straight through: the engine is fine, the
+      // background caller just has to ask again later.
       if (engine.dead) retire(engine);
       throw error;
     }

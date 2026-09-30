@@ -12,6 +12,8 @@ import {
   type MoveAssessment,
   type MoveQuality,
 } from "../engine/moveQuality";
+import { isScored } from "../engine/recordEval";
+import type { GameSweep } from "../engine/useGameSweep";
 import type { MoveLogEntry } from "../config/types";
 
 interface MoveLogProps {
@@ -24,6 +26,10 @@ interface MoveLogProps {
   onForward: () => void;
   onFirst: () => void;
   onLast: () => void;
+  // The "Analyze game" run's state. Starting one needs App's MultiPV, so it
+  // comes in as its own callback; stopping is sweep.cancel.
+  sweep: Pick<GameSweep, "running" | "done" | "total" | "error" | "cancel">;
+  onAnalyzeGame: () => void;
 }
 
 interface LogCell {
@@ -197,8 +203,14 @@ export function MoveLog({
   onForward,
   onFirst,
   onLast,
+  sweep,
+  onAnalyzeGame,
 }: MoveLogProps) {
   const rows = buildRows(entries);
+  // Nothing to sweep once every position is scored. A game ending in mate keeps
+  // one unscored entry for good (the engine returns no lines there), so the
+  // button stays live for it - pressing it again is one instant search.
+  const unscored = entries.some((entry) => !isScored(entry));
   const [copied, setCopied] = useState(false);
   const listRef = useRef<HTMLOListElement | null>(null);
   const currentRowRef = useRef<HTMLLIElement | null>(null);
@@ -225,6 +237,26 @@ export function MoveLog({
       <div className="move-log-header">
         <h2>Moves</h2>
         <div className="move-log-actions">
+          {sweep.running ? (
+            <button
+              type="button"
+              className="action-btn"
+              onClick={sweep.cancel}
+              title="Stop analyzing the game - moves scored so far keep their marks"
+            >
+              Stop ({sweep.done}/{sweep.total})
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="action-btn"
+              onClick={onAnalyzeGame}
+              disabled={rows.length === 0 || !unscored}
+              title="Analyze every move in the game so each one gets its mark"
+            >
+              Analyze game
+            </button>
+          )}
           <button
             type="button"
             className="action-btn"
@@ -277,6 +309,7 @@ export function MoveLog({
           </div>
         </div>
       </div>
+      {sweep.error ? <p className="error">{sweep.error}</p> : null}
 
       {/* No rows means no marks, so the key would be explaining something that
           isn't on screen - and the empty state is the one place this panel has

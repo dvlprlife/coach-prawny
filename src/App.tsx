@@ -20,6 +20,8 @@ import { MoveLog } from "./components/MoveLog";
 import { NoteLog } from "./components/NoteLog";
 import { About } from "./components/About";
 import { useStockfish } from "./engine/useStockfish";
+import { useGameSweep } from "./engine/useGameSweep";
+import { recordEval } from "./engine/recordEval";
 import { STARTING_FEN } from "./engine/fen";
 import { fenFromSearch, searchForFen } from "./engine/positionLink";
 import { config } from "./config/config";
@@ -105,12 +107,32 @@ export default function App() {
   const [engineMultiPv, setEngineMultiPv] = useState(config.engine.multiPv);
   const [showAbout, setShowAbout] = useState(false);
 
+  // "Analyze game": scores every unscored move in the log with background
+  // searches, writing each result through the same recordEval as the live
+  // analysis below. Cancelled directly from the only two paths that replace or
+  // truncate the log (handleFenChange, loadGame) and when the engine's MultiPV
+  // changes, so one run never mixes settings or writes onto a different game.
+  const sweep = useGameSweep({
+    workerUrl: stockfishUrl,
+    entries: game.entries,
+    onRecord: (index, res) =>
+      setGame((g) => {
+        const entries = recordEval(g.entries, index, res);
+        return entries ? { ...g, entries } : g;
+      }),
+  });
+
   // 0 is a display state, so it never reaches the engine. Leaving engineMultiPv
   // alone also means toggling the list off and back on costs no search at all:
   // the effect below doesn't re-run, and the existing result is still there.
   function handleMoveCountChange(count: number) {
     setMoveCount(count);
-    if (count > 0) setEngineMultiPv(count);
+    if (count > 0) {
+      // A sweep searches at the MultiPV it started with, and MultiPV changes
+      // the grades - so a new setting ends the run rather than mixing the two.
+      if (count !== engineMultiPv) sweep.cancel();
+      setEngineMultiPv(count);
+    }
     // Hiding the list has to drop the arrows with it. A pin is unpinned by
     // clicking its row, so a pinned arrow outliving the rows would be stuck on
     // the board with nothing left to click - and a hover can outlive them too,
@@ -134,6 +156,7 @@ export default function App() {
     newFen: Fen,
     move?: { san: string; from: Square; to: Square }
   ) {
+    sweep.cancel();
     setGame((g) => {
       if (move) {
         const truncated = g.entries.slice(0, g.index + 1);
@@ -171,13 +194,13 @@ export default function App() {
   // Lands on the FINAL position, the way opening a game on any chess site does -
   // the result is what you came to look at, and ← steps back from there.
   //
-  // Every entry arrives unscored: MoveLogEntry's eval fields are filled in by the
-  // analysis effect below, one position at a time, as each is actually shown. So
-  // a freshly loaded game is unannotated until you step back through it, and the
-  // annotations appear as you go. Sweeping the whole game up front would mean
-  // running the engine over 40 positions before showing anything.
+  // Every entry arrives unscored. The analysis effect below scores each position
+  // as it is shown, and "Analyze game" (the sweep above) scores the rest in the
+  // background. The sweep is deliberately not started here: it would put the
+  // engine over 40 positions before the user has asked for anything.
   function loadGame(entries: MoveLogEntry[], loaded: string) {
     if (entries.length === 0) return;
+    sweep.cancel();
     // A different game entirely - same reasoning as the reset above.
     setGame({ entries, index: entries.length - 1, notes: [], loaded });
   }
@@ -331,42 +354,24 @@ export default function App() {
   // Driven by the result arriving rather than by an effect watching `result`:
   // this runs exactly once per analysis, where the effect re-ran on every
   // change to `result` or `fen` and needed its equality check purely to stop
-  // itself looping. That check is kept below, but now only to skip a pointless
+  // itself looping. That check is kept in recordEval, but now only to skip a pointless
   // re-render when a position is re-analyzed to the same numbers - stepping
   // away and back does that.
   //
-  // Only the entry the result actually belongs to is ever written:
-  // `entry.fen !== res.fen` is what turns a result landing after the board has
-  // moved into a no-op instead of scoring the wrong move.
+  // Only the entry the result actually belongs to is ever written: recordEval's
+  // fen check is what turns a result landing after the board has moved into a
+  // no-op instead of scoring the wrong move.
   //
-  // A position only gets scored once it has been analyzed, so playing faster
-  // than the search completes leaves entries unscored - those moves simply go
-  // unannotated, and fill in if you step back through them later.
+  // A position only gets scored here once it has been shown and analyzed, so
+  // playing faster than the search completes leaves entries unscored. Those
+  // fill in if you step back through them, or all at once with "Analyze game".
   const { result, analyzing, error, analyze } = useStockfish({
     workerUrl: stockfishUrl,
-    onResult: (res) => {
-      const best = res.moves.find((m) => m.rank === 1);
-      if (!best) return;
+    onResult: (res) =>
       setGame((g) => {
-        const entry = g.entries[g.index];
-        if (!entry || entry.fen !== res.fen) return g;
-        if (
-          entry.evalCp === best.evalCp &&
-          entry.mateIn === best.mateIn &&
-          entry.bestUci === best.move
-        ) {
-          return g;
-        }
-        const entries = g.entries.slice();
-        entries[g.index] = {
-          ...entry,
-          evalCp: best.evalCp,
-          mateIn: best.mateIn,
-          bestUci: best.move,
-        };
-        return { ...g, entries };
-      });
-    },
+        const entries = recordEval(g.entries, g.index, res);
+        return entries ? { ...g, entries } : g;
+      }),
   });
 
   // The move that produced the currently-displayed position, whatever put us
@@ -451,6 +456,8 @@ export default function App() {
               onForward={goForward}
               onFirst={goToStart}
               onLast={goToEnd}
+              sweep={sweep}
+              onAnalyzeGame={() => sweep.start(engineMultiPv)}
             />
             <NoteLog
               entries={game.entries}
