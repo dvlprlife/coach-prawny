@@ -223,7 +223,7 @@ describe("display tables", () => {
     }
   });
 
-  it("leaves ordinary good moves unannotated", () => {
-    expect(QUALITY_GLYPH.good).toBe("");
+  it("marks ordinary good moves with a check, so blank means unanalyzed", () => {
+    expect(QUALITY_GLYPH.good).toBe("✓");
   });
 });

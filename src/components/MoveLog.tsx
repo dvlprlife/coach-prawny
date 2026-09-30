@@ -77,8 +77,8 @@ function assessmentTitle(assessment: MoveAssessment): string {
   return `${label} - gave up ${(assessment.lossCp / 100).toFixed(2)}`;
 }
 
-// The annotation shown after a move. "good" has an empty glyph on purpose:
-// marking every unremarkable move would drown out the ones worth seeing.
+// The annotation shown after a move. Every verdict has a glyph, so nothing is
+// rendered only for a move that hasn't been assessed yet.
 function Annotation({ assessment }: { assessment: MoveAssessment | null }) {
   if (!assessment) return null;
   const glyph = QUALITY_GLYPH[assessment.quality];
@@ -97,10 +97,9 @@ function Annotation({ assessment }: { assessment: MoveAssessment | null }) {
 // because there is no element there to hover.
 //
 // Built from QUALITY_GLYPH/QUALITY_LABEL rather than written out, so retuning a
-// band or renaming a verdict can't leave a stale second copy here. "good" drops
-// out of the list on its own - its glyph is deliberately empty - and the
-// unmarked case is spelled out underneath instead, where it can also cover the
-// not-yet-analyzed case that looks identical.
+// band or renaming a verdict can't leave a stale second copy here. The filter
+// only guards against a verdict ever being given an empty glyph again; the
+// unmarked case - a move not analyzed yet - is spelled out underneath.
 //
 // <details> rather than a button and some state: it is keyboard-operable and
 // announced as a disclosure for free, and the closed state costs one line.
@@ -122,8 +121,8 @@ function QualityLegend() {
         ))}
       </dl>
       <p>
-        No mark means the move was sound - or that it hasn't been analyzed yet.
-        Hover a mark to see how much it gave up.
+        No mark means the move hasn't been analyzed yet. Hover a mark to see
+        how much it gave up.
       </p>
     </details>
   );
