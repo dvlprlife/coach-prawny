@@ -5,7 +5,7 @@
 # rules in .oxlintrc.json. Committed so that an oxlint bump which arms new
 # rules shows up as a diff here instead of only as a CI failure.
 #
-# oxlint 1.83.0
+# oxlint 1.93.0
 # 160 rules
 
 constructor-super = deny
