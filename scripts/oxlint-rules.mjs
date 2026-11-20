@@ -16,9 +16,11 @@
 // names no rule), so the bare CI output cannot answer it.
 //
 // Regenerate whenever oxlint moves - as part of the commit that deals with the
-// bump. Deliberately NOT enforced in CI: Dependabot cannot regenerate it, so a
-// staleness check would force a human push onto every oxlint bump, including
-// the ones that merge clean today.
+// bump. CI (.github/workflows/build.yml) regenerates it and fails only if the
+// RULE LINES differ from the committed copy. A change to just the "# oxlint
+// X.Y.Z" header is a warning, not a failure: Dependabot cannot regenerate this
+// file, so a strict check would force a human push onto every oxlint bump,
+// including the ones that change no rules and would otherwise merge clean.
 //
 // `oxlint --rules` looks like it should do this and emits nothing at all in
 // 1.83; `--print-config` is the option that works.

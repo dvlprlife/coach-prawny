@@ -39,6 +39,32 @@ jobs:
           node-version: '26.x'
           cache: 'npm'
       - run: npm ci
+      # .oxlint-rules.txt is the committed snapshot of the rules oxlint really
+      # enforces (scripts/oxlint-rules.mjs explains why it exists). Regenerate
+      # it and compare against the committed copy, but only fail on the rule
+      # lines. Dependabot cannot regenerate the file, so failing on the
+      # "# oxlint X.Y.Z" header too would block every oxlint bump, including
+      # the ones that change no rules. A header-only drift is a warning
+      # annotation instead. This runs before Lint on purpose: when a bump arms
+      # new rules, the rule diff should be the first thing in the log, ahead
+      # of the lint errors those rules cause.
+      - name: Check .oxlint-rules.txt is current
+        shell: bash
+        run: |
+          npm run -s lint:rules
+          if git diff --quiet -- .oxlint-rules.txt; then
+            echo "ok: .oxlint-rules.txt is current"
+            exit 0
+          fi
+          if diff <(git show HEAD:.oxlint-rules.txt | grep -v '^#') \
+                  <(grep -v '^#' .oxlint-rules.txt) > /dev/null; then
+            echo "::warning file=.oxlint-rules.txt::Only the header changed (rule set is the same). Run 'npm run lint:rules' and commit when convenient."
+            git diff -- .oxlint-rules.txt
+            exit 0
+          fi
+          echo "::error file=.oxlint-rules.txt::The enforced oxlint rule set changed. Run 'npm run lint:rules' and commit the result with this change."
+          git diff -- .oxlint-rules.txt
+          exit 1
       # oxlint rather than ESLint: typescript-eslint hard-refuses to load
       # against TypeScript 7 (it throws on startup, so --force does not help),
       # and this repo is on TS 7. oxlint brings its own parser and has no
